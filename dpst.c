@@ -4,10 +4,20 @@
 #include <limits.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdint.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+
+/* 全局标识符 */
+struct {
+	char status;
+	uint8_t process_type;
+	int manager_worker_reloading;
+	int manager_reload_flag;
+} SG;
 
 void* Realloc(void *ptr, int n) {
 	ptr = realloc(ptr, n);
@@ -140,6 +150,8 @@ int Worker_exec(DSPT *dspt, int n) {
 			if (n != i)
 				close(dsptCTX->workers[i].pipe_fd);
 		}
+		//进程标识
+		SG.process_type = WORKER_PROCESS;
 		//进程处理过程
 		Worker_main(dsptCTX, dsptCTX->workers[n].pipe_fd);
 		exit(0);
@@ -148,14 +160,42 @@ int Worker_exec(DSPT *dspt, int n) {
 	}
 }
 
+void SIG_sigusr1(int signo) {
+	SG.manager_worker_reloading = 1;
+	SG.manager_reload_flag = 0;
+	printf("recev a sig[%d]\n", signo);
+}
+
 /* 管理进程过程 */
-void DSPT_manager(DSPT *dspt) {
-	int pid;
-	printf("Manager[%d] Runnig\n", getpid());
+void DSPT_main(DSPT *dspt) {
+	int i;
+	pid_t pid;
+
+	(void) signal(SIGUSR1, SIG_sigusr1);
+
 	while (1) {
 		pid = wait(NULL);
 		if (pid < 0) {
-			printf("Manager wait: %s\n", strerror(errno));
+			perror("DSPT_main wait");
+			goto CLEAN;
+		}
+		//某个 worker进程意外结束
+		if (SG.status == 1 && pid != -1) {
+			for (i = 0; i < dspt->num_workers; i++) {
+				if (pid != dspt->workers[i].pid)
+					continue;
+				//重新起一个worker进程
+				int npid = Worker_exec(dspt, i);
+				if (npid < 0) {
+					perror("DSPT_main refork error");
+					return;
+				} else {
+					dspt->workers[i].pid = npid;
+				}
+			}
+		}
+		CLEAN:
+		if (SG.manager_worker_reloading == 1) {
 		}
 	}
 }
@@ -202,7 +242,9 @@ void DSPT_start(DSPT *dspt) {
 			}
 		}
 
-		DSPT_manager(dsptCTX);
+		//标识为管理进程
+		SG.process_type = MANAGE_PROCESS;
+		DSPT_main(dsptCTX);
 	} else { //主进程
 		dsptCTX->pid = pid;
 		//主进程管道只开启读端
@@ -298,13 +340,15 @@ int main(void)
 	Vec(Jobs) cq;
 	vec_init(&cq);
 
-	num_jobs = 1000;
+	num_jobs = 10;
 	for (i = 0; i < num_jobs; i++) {
 		Jobs jobs = {"Yhm, Forever!", i};
 		vec_push(&cq, jobs);
 	}
 
 	printf("Master[%d] Runnig\n", getpid());
+	SG.status = 1;
+	SG.process_type = MASTER_PROCESS;
 
 	DSPT_init(&dspt, 3);
 	DSPT_start(&dspt);
