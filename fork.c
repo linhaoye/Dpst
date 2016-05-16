@@ -19,81 +19,6 @@ struct {
 	int manager_reload_flag;
 } SG;
 
-void* Realloc(void *ptr, int n) {
-	ptr = realloc(ptr, n);
-	if (!ptr && n != 0) {
-		perror("out of memory");
-	}
-	return ptr;
-}
-
-void* Malloc(size_t n) {
-	void *ptr;
-	ptr = malloc(n);
-	if (!ptr) {
-		perror("memory allocation fail");
-	}
-	bzero(ptr, n);
-
-	return ptr;
-}
-
-void Free(void *ptr) {
-	free(ptr);
-}
-
-static void vec_expand(char **data, int *length, int *capacity, int memsz) {
-	if (*length + 1 > *capacity) {
-		if (*capacity == 0) {
-			*capacity = 1;
-		} else {
-			*capacity <<= 1;
-		}
-		*data = Realloc(*data, *capacity * memsz);
-	}
-}
-
-static void vec_splice(
-  char **data, int *length, int *capacity, int memsz, int start, int count
-) {
-	(void) capacity;
-	memmove(*data + start * memsz,
-	      *data + (start + count) * memsz,
-	      (*length - start - count) * memsz);
-}
-
-
-#define Vec(T)\
-  struct { T *data; int length, capacity; }
-
-
-#define vec_unpack(v)\
-  (char**)&(v)->data, &(v)->length, &(v)->capacity, sizeof(*(v)->data)
-
-
-#define vec_init(v)\
- 	memset((v), 0, sizeof(*(v)))
-
-
-#define vec_deinit(v)\
-	Free((v)->data)
-
-
-#define vec_clear(v)\
-	((v)->length = 0)
-
-
-#define vec_push(v, val)\
-	( vec_expand(vec_unpack(v)),\
-		(v)->data[(v)->length++] = (val) )
-
-
-#define vec_splice(v, start, count)\
-	( vec_splice(vec_unpack(v), start, count),\
-		(v)->length -= (count) )
-
-typedef int Socket;
-
 /* 进程标识符 */
 enum {
 	MASTER_PROCESS,
@@ -163,24 +88,38 @@ int Worker_exec(DSPT *dspt, int n) {
 void SIG_sigusr1(int signo) {
 	SG.manager_worker_reloading = 1;
 	SG.manager_reload_flag = 0;
-	printf("recev a sig[%d]\n", signo);
+}
+
+void SIG_sigterm(int signo) {
+	SG.status = 0;
 }
 
 /* 管理进程过程 */
 void DSPT_main(DSPT *dspt) {
 	int i;
+	int n;
 	pid_t pid;
+	Worker rworkers;
 
 	(void) signal(SIGUSR1, SIG_sigusr1);
+	(void) signal(SIGTERM, SIG_sigterm);
 
-	while (1) {
+	rworkers = Realloc(NULL, dspt->num_workers * sizeof(Worker));
+
+	while (SG.status) {
 		pid = wait(NULL);
+
 		if (pid < 0) {
-			perror("DSPT_main wait");
-			goto CLEAN;
+			if (SG.manager_worker_reloading == 0) {
+				perror("DSPT_main wait");
+			} else if (SG.manager_reload_flag == 0) {
+				memcpy(rworkers, dspt->workers, sizeof(Worker) * dspt->num_workers);
+				SG.manager_reload_flag = 1;
+				goto CLEAN;
+			}
 		}
 		//某个 worker进程意外结束
-		if (SG.status == 1 && pid != -1) {
+		if (SG.status && pid != -1) {
 			for (i = 0; i < dspt->num_workers; i++) {
 				if (pid != dspt->workers[i].pid)
 					continue;
@@ -196,8 +135,19 @@ void DSPT_main(DSPT *dspt) {
 		}
 		CLEAN:
 		if (SG.manager_worker_reloading == 1) {
+			if (n >= dspt->num_workers) {
+				SG.manager_worker_reloading = 0;
+				n = 0;
+				continue;
+			}
+			if (kill(rworkers[n].pid, SIGTERM) < 0) {
+				continue;
+			}
+			n ++;
 		}
 	}
+	
+	Free(rworkers);
 }
 
 void DSPT_init(DSPT *dspt, int num_workers) {
@@ -266,70 +216,6 @@ void DSPT_dispatch(DSPT *dspt, void *data) {
 	if (nWrite > 0) {
 		printf ("Master send jobs: buf=%s | fd=%d\n", jobs->buf, jobs->fd);
 	}
-}
-
-enum {
-	SELECT_READ,
-	SELECT_WRITE,
-	SELECT_EXCEPT,
-	SELECT_MAX
-};
-
-typedef struct {
-	int capacity;
-	Socket maxfd;
-	fd_set *fds[SELECT_MAX];
-} SelectSet;
-
-#define _UNSIGNED_BIT (sizeof(unsigned) * CHAR_BIT)
-
-void select_deinit(SelectSet *s) {
-	int i;
-	for (i = 0; i <SELECT_MAX; i++) {
-		Free(s->fds[i]);
-		s->fds[i] = NULL;
-	}
-	s->capacity = 0;
-}
-
-void select_grow(SelectSet *s) {
-	int i;
-	int oldCapacity = s->capacity;
-	s->capacity = s->capacity ? s->capacity << 1 : 1;
-
-	for (i = 0; i < SELECT_MAX; i++) {
-		s->fds[i] = Realloc(s->fds[i], s->capacity * sizeof (fd_set));
-		memset (s->fds[i] + oldCapacity, 0,
-			(s->capacity - oldCapacity) * sizeof (fd_set));
-	}
-}
-
-void select_zero(SelectSet *s) {
-	int i;
-	if (s->capacity == 0) return;
-	s->maxfd = 0;
-
-	for (i = 0; i < SELECT_MAX; i++) {
-		memset(s->fds[i], 0, s->capacity * sizeof(fd_set));
-	}
-}
-
-void select_add(SelectSet *s, int set, Socket fd) {
-	unsigned *p;
-	while (s->capacity * FD_SETSIZE < fd) {
-		select_grow(s);
-	}
-	p = (unsigned *) s->fds[set];
-	p[fd / _UNSIGNED_BIT] |= 1 << (fd % _UNSIGNED_BIT);
-}
-
-int select_has(SelectSet *s, int set, Socket fd) {
-	unsigned *p;
-	if (s->maxfd < fd) return 0;
-
-	p = (unsigned *) s->fds[set];
-
-	return p[fd / _UNSIGNED_BIT] & ( 1 << (fd % _UNSIGNED_BIT));
 }
 
 #ifdef __MAIN__
