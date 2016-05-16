@@ -7,9 +7,15 @@ typedef struct Foo {
 	int ace;
 } Foo;
 
+typedef Vec(Foo) vector_string;
+
+void func(vector_string *cq) {
+
+}
+
 int main(void)
 {
-	Vec(Foo) foo;
+	vector_string foo;
 
 	vec_init(&foo);
 	vec_deinit(&foo);

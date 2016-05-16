@@ -3,6 +3,8 @@
 
 /* global tag */
 struct {
+	short status;
+	short process_type;
 } SG;
 
 #endif

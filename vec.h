@@ -2,6 +2,7 @@
 #define __VEC_H__
 
 #include <string.h>
+#include <assert.h>
 #include "utils.h"
 
 static void vec_expand(char **data, int *length, int *capacity, int memsz) {
@@ -49,9 +50,15 @@ static void vec_splice(
 	( vec_expand(vec_unpack(v)),\
 		(v)->data[(v)->length++] = (val) )
 
+#define vec_get(v, pos)\
+	(assert(pos < (v)->length),\
+	(v)->data[pos] )
+
 
 #define vec_splice(v, start, count)\
 	( vec_splice(vec_unpack(v), start, count),\
 		(v)->length -= (count) )
+
+typedef Vec(char*) Vec_string;
 
 #endif
