@@ -3,12 +3,53 @@
 #include "vec.h"
 #include "utils.h"
 
+enum {
+	J_ROSTER,
+	J_PRESENCE,
+	J_MESSAGE,
+	J_REGISTER,
+	J_ADDGATEWAY
+};
+
 static char* strtolower(const char *s) {
 
 }
 
 static char* create_roster_xml(Vec_string *v) {
+	int i;
+	int flag;
+	int counter = 0;
+	char *t;
 	char *s = strdup("<ROSTER>");
+	char *txt;
+	char *delimiter = "~";
+	char *scratch;
+	char buf[1024];
+
+	for (i = 0; i < vec_len(v); i++) {
+		t = vec_get(v, i);
+		memcpy(buf, t, sizeof(buf));
+
+		while( (txt = strtok_r(!counter? buf: NULL, delimiter, &scratch))) {
+			counter ++;
+		}
+
+		flag = counter < 4 ? 0: 1;
+		counter = 0;
+		memcpy(buf, t, sizeof(buf));
+
+		while ( (txt = strtok_r(!counter? buf: NULL, delimiter, &scratch) ) && flag) {
+			if (strcmp(txt, "jid") == 0) {
+				txt = strtok_r(NULL, delimiter, &scratch);
+				asprintf(&s, "%s<FriendID>%s</FriendID>", s, txt);
+			} else if (strcmp(txt, "subscription") == 0) {
+				txt = strtok_r(NULL, delimiter, &scratch);
+				asprintf(&s, "%s<Subscription>%s</Subscription>", s, txt);
+			}
+			counter++;
+		}
+	}
+	asprintf(&s, "%s</ROSTER>", s);
 
 	return s;	
 }
@@ -16,7 +57,7 @@ static char* create_roster_xml(Vec_string *v) {
 static char* create_presence_xml(Vec_string *v) {
 	char *scratch, *delimiter = "~";
 	char *s = strdup("<NotifyFriends>");
-	char *str = vec_get(v, 0);
+	char *t = vec_get(v, 0);
 	short type = 0;
 	short done = 0;
 	int counter = 0;
@@ -25,7 +66,7 @@ static char* create_presence_xml(Vec_string *v) {
 	char buf[1024];
 	char temp[1024];
 
-	memcpy(buf, str, sizeof(buf));
+	memcpy(buf, t, sizeof(buf));
 
 	while( (txt = strtok_r(!counter? buf: NULL, delimiter, &scratch))) {
 		if (strcmp(txt, "from") == 0 && !done) {
@@ -84,12 +125,11 @@ static char* create_message_xml(Vec_string *v) {
 
 static char* create_registeration_xml(Vec_string *v) {
 	char *s = strdup("<Register>");
-	char *str = vec_get(v, 0);
+	char *t = vec_get(v, 0);
 
-	if (strcmp(str, "0") == 0) {
+	if (strcmp(t, "0") == 0) {
 		asprintf(&s, "%s<int>-1</int>", s);
-	}
-	else if (strcmp(str, "1") == 0) {
+	} else if (strcmp(t, "1") == 0) {
 		asprintf(&s, "%s<int>1</int>", s);
 	}
 	asprintf(&s, "%s</Register>", s);
@@ -99,9 +139,9 @@ static char* create_registeration_xml(Vec_string *v) {
 
 static char* create_add_gateway_xml(Vec_string *v) {
 	char *s = strdup("<AddGateWay>");
-	char *str = vec_get(v, 0);
+	char *t = vec_get(v, 0);
 
-	if (strcmp("0", str) == 0) {
+	if (strcmp("0", t) == 0) {
 		asprintf(&s, "%s<code>-1</code>", s);
 	}
 	asprintf(&s, "%s</AddGateWay>", s);
@@ -109,20 +149,33 @@ static char* create_add_gateway_xml(Vec_string *v) {
 	return s;
 }
 
-char* create_xml(const char* type, Vec_string *v) {
+char* create_xml(int type, Vec_string *v) {
 	char *t;
 	char *s = strdup("<?xml version=\'1.0\' encoding=\'utf-8\'?><InstantMessenger>");
 
-	if (strcmp(type, "ROSTER") == 0) {
-		t = create_roster_xml(v);
-	} else if (strcmp(type, "PRESENCE") == 0) {
-		t = create_presence_xml(v);
-	} else if (strcmp(type, "MESSAGE") == 0) {
-		t = create_message_xml(v);
-	} else if (strcmp(type, "REGISTER") == 0) {
-		t = create_registeration_xml(v);
-	} else if (strcmp(type, "ADDGATEWAY") == 0) {
-		t = create_add_gateway_xml(v);
+	switch (type) {
+		case J_ROSTER:
+			t = create_roster_xml(v);
+			break;
+
+		case J_PRESENCE:
+			t = create_presence_xml(v);
+			break;
+
+		case J_MESSAGE:
+			t = create_message_xml(v);
+			break;
+
+		case J_REGISTER:
+			t = create_roster_xml(v);
+			break;
+
+		case J_ADDGATEWAY:
+			t = create_add_gateway_xml(v);
+			break;
+
+		default:
+			return NULL;
 	}
 
 	asprintf(&s, "%s%s</InstantMessenger>", s, t);
@@ -164,6 +217,18 @@ int main(void)
 	vec_clear(&s);
 	vec_push(&s, "from~lucy@msn.jabber.org~type~unsubscribed");
 	xml = create_presence_xml(&s);
+	printf("%s\n", xml);
+	deinit_xml(xml);
+
+	vec_clear(&s);
+	vec_push(&s, "jid~lucy@msn.jabber.org~subscription~YES~HEI");
+	xml = create_roster_xml(&s);
+	printf("%s\n", xml);
+	deinit_xml(xml);
+
+	vec_clear(&s);
+	vec_push(&s, "jid~lucy@msn.jabber.org~subscription~YES~HEI");
+	xml = create_xml(J_ROSTER, &s);
 	printf("%s\n", xml);
 	deinit_xml(xml);
 

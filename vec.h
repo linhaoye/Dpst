@@ -54,6 +54,9 @@ static void vec_splice(
 	(assert(pos < (v)->length),\
 	(v)->data[pos] )
 
+#define vec_len(v)\
+	((v)->length)
+
 
 #define vec_splice(v, start, count)\
 	( vec_splice(vec_unpack(v), start, count),\
