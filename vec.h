@@ -62,6 +62,4 @@ static void vec_splice(
 	( vec_splice(vec_unpack(v), start, count),\
 		(v)->length -= (count) )
 
-typedef Vec(char*) Vec_string;
-
 #endif

@@ -2,18 +2,7 @@
 #include <string.h>
 #include "vec.h"
 #include "utils.h"
-
-enum {
-	J_ROSTER,
-	J_PRESENCE,
-	J_MESSAGE,
-	J_REGISTER,
-	J_ADDGATEWAY
-};
-
-static char* strtolower(const char *s) {
-
-}
+#include "xml.h"
 
 static char* create_roster_xml(Vec_string *v) {
 	int i;
@@ -39,10 +28,10 @@ static char* create_roster_xml(Vec_string *v) {
 		memcpy(buf, t, sizeof(buf));
 
 		while ( (txt = strtok_r(!counter? buf: NULL, delimiter, &scratch) ) && flag) {
-			if (strcmp(txt, "jid") == 0) {
+			if (strcasecmp(txt, "jid") == 0) {
 				txt = strtok_r(NULL, delimiter, &scratch);
 				asprintf(&s, "%s<FriendID>%s</FriendID>", s, txt);
-			} else if (strcmp(txt, "subscription") == 0) {
+			} else if (strcasecmp(txt, "subscription") == 0) {
 				txt = strtok_r(NULL, delimiter, &scratch);
 				asprintf(&s, "%s<Subscription>%s</Subscription>", s, txt);
 			}
@@ -69,10 +58,10 @@ static char* create_presence_xml(Vec_string *v) {
 	memcpy(buf, t, sizeof(buf));
 
 	while( (txt = strtok_r(!counter? buf: NULL, delimiter, &scratch))) {
-		if (strcmp(txt, "from") == 0 && !done) {
+		if (strcasecmp(txt, "from") == 0 && !done) {
 			txt = strtok_r(NULL, delimiter, &scratch);
 
-			if (strcmp("jabber.org", txt) != 0) {
+			if (strcasecmp("jabber.org", txt) != 0) {
 				ch = strchr(txt, '@');
 				if (ch) {
 					strncpy(temp, txt, ch - txt);
@@ -82,22 +71,22 @@ static char* create_presence_xml(Vec_string *v) {
 				asprintf(&s, "%s<UserName>%s</UserName>", s, ch);
 				done = 1;
 			}
-		} else if (strcmp(txt, "type") == 0) {
+		} else if (strcasecmp(txt, "type") == 0) {
 			txt = strtok_r(NULL, delimiter, &scratch);
 
-			if (strcmp(txt, "unavailable") == 0)
+			if (strcasecmp(txt, "unavailable") == 0)
 				asprintf(&s, "%s<Status>Off-Line</Status>", s);
 
-			if (strcmp(txt, "subscribe") == 0)
+			if (strcasecmp(txt, "subscribe") == 0)
 				asprintf(&s, "%s<Status>Subscribe</Status>", s);
 
-			if (strcmp(txt, "unsubscribe") == 0)
+			if (strcasecmp(txt, "unsubscribe") == 0)
 				asprintf(&s, "%s<Status>UnSubscribe</Status>", s);
 
-			if (strcmp(txt, "unsubscribed") == 0)
+			if (strcasecmp(txt, "unsubscribed") == 0)
 				asprintf(&s, "%s<Status>UnSubscribed</Status>", s);
 
-			if (strcmp(txt, "Subscribed") == 0)
+			if (strcasecmp(txt, "Subscribed") == 0)
 				asprintf(&s, "%s<Status>Subscribed</Status>", s);
 
 			type = 1;
@@ -127,9 +116,9 @@ static char* create_registeration_xml(Vec_string *v) {
 	char *s = strdup("<Register>");
 	char *t = vec_get(v, 0);
 
-	if (strcmp(t, "0") == 0) {
+	if (strcasecmp(t, "0") == 0) {
 		asprintf(&s, "%s<int>-1</int>", s);
-	} else if (strcmp(t, "1") == 0) {
+	} else if (strcasecmp(t, "1") == 0) {
 		asprintf(&s, "%s<int>1</int>", s);
 	}
 	asprintf(&s, "%s</Register>", s);
@@ -141,7 +130,7 @@ static char* create_add_gateway_xml(Vec_string *v) {
 	char *s = strdup("<AddGateWay>");
 	char *t = vec_get(v, 0);
 
-	if (strcmp("0", t) == 0) {
+	if (strcasecmp("0", t) == 0) {
 		asprintf(&s, "%s<code>-1</code>", s);
 	}
 	asprintf(&s, "%s</AddGateWay>", s);
@@ -187,53 +176,3 @@ char* create_xml(int type, Vec_string *v) {
 void deinit_xml(char *s) {
 	Free(s);
 }
-
-#ifdef __MAIN__
-
-int main(void)
-{
-	Vec_string s;
-	vec_init(&s);
-	vec_push(&s, "Hello world!");
-	vec_push(&s, "Andy");
-	vec_push(&s, "Marey");
-
-	char *xml = create_message_xml(&s);
-	printf ("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_clear(&s);
-	vec_push(&s, "0");
-	xml = create_add_gateway_xml(&s);
-	printf("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_clear(&s);
-	vec_push(&s, "0");
-	xml = create_registeration_xml(&s);
-	printf("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_clear(&s);
-	vec_push(&s, "from~lucy@msn.jabber.org~type~unsubscribed");
-	xml = create_presence_xml(&s);
-	printf("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_clear(&s);
-	vec_push(&s, "jid~lucy@msn.jabber.org~subscription~YES~HEI");
-	xml = create_roster_xml(&s);
-	printf("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_clear(&s);
-	vec_push(&s, "jid~lucy@msn.jabber.org~subscription~YES~HEI");
-	xml = create_xml(J_ROSTER, &s);
-	printf("%s\n", xml);
-	deinit_xml(xml);
-
-	vec_deinit(&s);
-	return 0;
-}
-
-#endif
