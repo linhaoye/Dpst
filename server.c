@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "io.h"
+#include "server.h"
 
 int tcp_server(int port, uint32_t address, int backlog) {
 	int sz = 1;
