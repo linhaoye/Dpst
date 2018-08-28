@@ -1,32 +1,32 @@
 #ifndef __VEC_H__
 #define __VEC_H__
 
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "utils.h"
 
 static void vec_expand(char **data, int *length, int *capacity, int memsz) {
-	if (*length + 1 > *capacity) {
-		if (*capacity == 0) {
-			*capacity = 1;
-		} else {
-			*capacity <<= 1;
-		}
-		*data = Realloc(*data, *capacity * memsz);
-	}
+  if (*length + 1 > *capacity) {
+    if (*capacity == 0) {
+      *capacity = 1;
+    } else {
+      *capacity <<= 1;
+    }
+    *data = realloc(*data, *capacity * memsz);
+  }
 }
 
 static void vec_splice(
   char **data, int *length, int *capacity, int memsz, int start, int count
 ) {
-	(void) capacity;
-	memmove(*data + start * memsz,
-	      *data + (start + count) * memsz,
-	      (*length - start - count) * memsz);
+  (void) capacity;
+  memmove(*data + start * memsz,
+        *data + (start + count) * memsz,
+        (*length - start - count) * memsz);
 }
 
 
-#define Vec(T)\
+#define vec(T)\
   struct { T *data; int length, capacity; }
 
 
@@ -35,31 +35,31 @@ static void vec_splice(
 
 
 #define vec_init(v)\
- 	memset((v), 0, sizeof(*(v)))
+  memset((v), 0, sizeof(*(v)))
 
 
 #define vec_deinit(v)\
-	Free((v)->data)
+  free((v)->data)
 
 
 #define vec_clear(v)\
-	((v)->length = 0)
+  ((v)->length = 0)
 
 
 #define vec_push(v, val)\
-	( vec_expand(vec_unpack(v)),\
-		(v)->data[(v)->length++] = (val) )
+  ( vec_expand(vec_unpack(v)),\
+    (v)->data[(v)->length++] = (val) )
 
 #define vec_get(v, pos)\
-	(assert(pos < (v)->length),\
-	(v)->data[pos] )
+  (assert(pos < (v)->length),\
+  (v)->data[pos] )
 
 #define vec_len(v)\
-	((v)->length)
+  ((v)->length)
 
 
 #define vec_splice(v, start, count)\
-	( vec_splice(vec_unpack(v), start, count),\
-		(v)->length -= (count) )
+  ( vec_splice(vec_unpack(v), start, count),\
+    (v)->length -= (count) )
 
 #endif
