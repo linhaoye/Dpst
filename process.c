@@ -7,254 +7,214 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "process.h"
 
 /**
  * global process mamanger object
  */
 static struct {
-	char status;  // status of process pool
-	uint8_t type; //process type
-	int wstat; //
-	int mstat;
-} pTag;
+  uint8_t process_type; //process type
+  int reloading; //
+  int whether_reload;
+} ctx;
 
+int *pool_status; //process pool status
 
 /* process tag */
 enum {
-	MASTER_PROCESS,
-	WORKER_PROCESS,
-	MANAGE_PROCESS
-};
-
-/* process status */
-enum {
-	RUN,
-	RELOAD
+  MASTER_PROCESS,
+  WORKER_PROCESS,
+  MANAGE_PROCESS
 };
 
 typedef struct {
-	int pipe[2];
+  int pipe[2];
 } Pipe;
 
-typedef struct {
-	char buf[512];
-	int fd;
-} Jobs;
+static int spawn(process_pool *pool, int n) {
+  int i, pid; 
+  process_pool *p = pool;
 
-typedef struct {
-	pid_t pid;
-	int pipe_fd;
-} worker;
+  pid = fork();
+  if (pid < 0) {
+    elog(0,"spawn worker: fork(): %s", strerror(ERRNO));
+    return -1;
+  } else if (pid == 0) {
+    for (i = 0; i < p->num_workers; i++) {
+      if (n != i) {
+        close(p->workers[i].pipe_fd);
+      }
+    }
+    ctx.process_type = WORKER_PROCESS;
+    worker_process(p, p->workers[n].pipe_fd);
+    return 0;
+  } else {
+    return pid;
+  }
+}
 
-typedef struct {
-	worker *workers;
-	int pid;
-	int num_workers;
-	int cur_wk;
-} process_pool;
+static void sigusr1(int signo) {
+  ctx.reloading = 1;
+  ctx.whether_reload = 0;
+}
 
-static int spawn_worker(process_pool *pool, int n) {
-	int i, pid;	
-	process_pool *ctx = pool;
-
-	pid = fork();
-	if (pid < 0) {
-		elog(0,"spawn worker: fork(): %s", strerror(ERRNO));
-		return -1;
-	} else if (pid == 0) {
-		for (i = 0; i < ctx->num_workers; i++) {
-			if (n != i) {
-				close(ctx->workers[i].pipe_fd);
-			}
-		}
-		pTag.type = WORKER_PROCESS;
-		worker_process(ctx, ctx->workers[n].pipe_fd);
-		return 0;
-	} else {
-		return pid;
-	}
+static void sigterm(int signo) {
+  *pool_status = 0;
 }
 
 static void worker_process(process_pool *pool, int p) {
-	int nRead;
-	pid_t pid;
-	Jobs jobs;
+  int n;
+  pid_t pid;
+  job_t jobs;
 
-	pid = getpid();
-	while (1) {
-		nRead = read(p, &jobs, sizeof(Jobs));
-		if (nRead > 0) {
-			printf("worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
-		}
-	}
+  pid = getpid();
+  while (1) {
+    n = read(p, &jobs, sizeof(job_t));
+    if (n > 0) {
+      emsg("worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
+    }
+  }
 }
 
 static void manager_process(process_pool *pool) {
-	int i;
-	int n;
-	pid_t pid;
-	worker rworkers;
+  int i, n, sz;
+  pid_t pid;
+  worker *workers;
 
-	(void) signal(SIGUSR1, sigusr1);
-	(void) signal(SIGTERM, sigterm);
+  (void) signal(SIGUSR1, sigusr1);
 
-	rworkers = Realloc(NULL, pool->num_workers * sizeof(worker));
+  n = 0;
+  sz = pool->num_workers * sizeof(worker);
+  workers = malloc(sz);
+  if (workers == NULL) {
+    elog(1, "mamanger process: malloc(%d): %s", sz, strerror(ERRNO));
+  }
 
-	while (pTag.status) {
-		pid = wait(NULL);
+  while (1) {
+    pid = wait(NULL);
 
-		if (pid < 0) {
-			if (pTag.wstat == 0) {
-				perror("manager_process wait");
-			} else if (pTag.mstat == 0) {
-				memcpy(rworkers, pool->workers, sizeof(worker) * pool->num_workers);
-				pTag.mstat = 1;
-				goto CLEAN;
-			}
-		}
-		//某个 worker进程意外结束
-		if (pTag.status && pid != -1) {
-			for (i = 0; i < pool->num_workers; i++) {
-				if (pid != pool->workers[i].pid)
-					continue;
-				//重新起一个worker进程
-				int npid = spawn_worker(pool, i);
-				if (npid < 0) {
-					perror("manager_process refork error");
-					return;
-				} else {
-					pool->workers[i].pid = npid;
-				}
-			}
-		}
-		CLEAN:
-		if (pTag.wstat == 1) {
-			if (n >= pool->num_workers) {
-				pTag.wstat = 0;
-				n = 0;
-				continue;
-			}
-			if (kill(rworkers[n].pid, SIGTERM) < 0) {
-				continue;
-			}
-			n ++;
-		}
-	}
-	
-	Free(rworkers);
-}
+    if (pid < 0) {
+      if (ctx.reloading == 0) {
+        elog(0, "wait child fail: wait(): %s", strerror(ERRNO));
+      } else if (ctx.whether_reload == 0) {
+        memcpy(workers, pool->workers, sz);
+        ctx.whether_reload = 1;
+        goto clean;
+      }
+    }
 
-void sigusr1(int signo) {
-	pTag.wstat = 1;
-	pTag.mstat = 0;
-}
-
-void sigterm(int signo) {
-	pTag.status = 0;
+    if (*pool_status == 1) {
+      for (i = 0; i < pool->num_workers; i++) {
+        if (pid != pool->workers[i].pid) {
+          continue;
+        }
+        int npid = spawn(pool, i);
+        if (npid < 0) {
+          elog(0, "refork process error: spawn(%x, %d)", pool, i)
+        } else {
+          pool->workers[i].pid = npid;
+        }
+      }
+    }
+clean:
+    if (ctx.reloading == 1) {
+      if (n >= pool->num_workers) {
+        ctx.reloading = 0;
+        n = 0;
+        continue;
+      }
+      if (kill(workers[n].pid, SIGTERM) < 0) {
+        continue;
+      }
+      n++;
+    }
+  }
+  free(workers);
 }
 
 void process_pool_init(process_pool *pool, int num_workers) {
-	assert(pool != NULL);
+  assert(pool != NULL);
 
-	pTag.status = 1;
-	pTag.type = MASTER_PROCESS;
+  int *ptr = mmap_malloc(64*1024);
+  pool_status = ptr
 
-	worker *workers;
-	int n = num_workers * sizeof(worker);
+  *pool_status = 1;
+  ctx.process_type = MASTER_PROCESS;
 
-	worker = malloc(n);
-	if (worker == NULL) {
-		elog(1, "init process pool: malloc(%d)", n, strerror(ERRNO));
-	}
+  worker *workers;
+  int n = num_workers * sizeof(worker);
 
-	pool->workers = workers;
-	pool->num_workers = num_workers;
-	pool->cur_wk = -1;
+  worker = malloc(n);
+  if (worker == NULL) {
+    elog(1, "init process pool: malloc(%d)", n, strerror(ERRNO));
+  }
+
+  pool->workers = workers;
+  pool->num_workers = num_workers;
+  pool->cur_wk = -1;
 }
 
 void process_pool_start(process_pool *pool) {
-	int i, pid;
-	Pipe *pipes;
-	process_pool *ctx = pool;
-	pipes = Realloc(NULL, ctx->num_workers * sizeof (Pipe));
+  int i,sz, pid;
+  Pipe *pipes;
 
-	for (i = 0; i < ctx->num_workers; i++) {
-		socketpair(PF_LOCAL, SOCK_DGRAM, 0, pipes[i].pipe);
-	}
+  process_pool *p = pool;
+  sz = p->num_workers * sizeof(Pipe);
 
-	pid = fork();
-	if (pid == -1) {
-		elog(1, "start process pool: fork()", strerror(ERRNO));
-	}
+  pipes = malloc(sz);
+  if (pipes == NULL) {
+    elog(1, "pool start: malloc(%d): %s", sz, strerror(ERRNO));
+  }
 
-	if (pid == 0) {
-		for (i = 0; i < ctx->num_workers; i++) {
-			close(pipes[i].pipe[0]);
-			ctx->workers[i].pipe_fd = pipes[i].pipe[1];
-			pid = spawn_worker(pool, i);
-			if (pid < 0) {
-				elog(0, "start process pool: spawn_worker(%x, %d)", 
-					pool, i strerror(ERRNO));
-				return;
-			} else {
-				ctx->workers[i].pid = pid;
-			}
-		}
-		pTag.type = MANAGE_PROCESS;
-		manager_process(ctx);
-	} else {
-		ctx->pid = pid;
-		for (i = 0; i < ctx->num_workers; i++) {
-			close(pipes[i].pipe[1]);
-			ctx->workers[i].pipe_fd = pipes[i].pipe[0];
-		}
-	}
+  for (i = 0; i < p->num_workers; i++) {
+    socketpair(PF_LOCAL, SOCK_DGRAM, 0, pipes[i].pipe);
+  }
+
+  pid = fork();
+  if (pid == -1) {
+    elog(1, "start process pool: fork()", strerror(ERRNO));
+  } else if (pid == 0) {
+    for (i = 0; i < p->num_workers; i++) {
+      close(pipes[i].pipe[0]);
+      p->workers[i].pipe_fd = pipes[i].pipe[1];
+
+      //管理进程创建工作进程
+      pid = spawn(pool, i);
+
+      if (pid < 0) {
+        elog(0, "start process pool: spawn(%x, %d)", pool, i strerror(ERRNO));
+        return;
+      } else {
+        p->workers[i].pid = pid;
+      }
+    }
+
+    ctx.process_type = MANAGE_PROCESS;
+
+    manager_process(p);
+  } else {
+    p->pid = pid;
+
+    for (i = 0; i < p->num_workers; i++) {
+      close(pipes[i].pipe[1]);
+      p->workers[i].pipe_fd = pipes[i].pipe[0];
+    }
+  }
 }
 
 void process_pool_dispatch(process_pool *pool, void *data) {
-	int n, nWrite;
-	Jobs *jobs = (Jobs*) data;
+  int n, m;
+  job_t *job = (job_t*) data;
 
-	n = jobs->fd % pool->num_workers;	
-	nWrite = write(pool->workers[n].pipe_fd, jobs, sizeof(Jobs));
+  n = job->fd % pool->num_workers;  
+  m = write(pool->workers[n].pipe_fd, job, sizeof(job_t));
 
-	if (nWrite > 0) {
-		printf ("Master send jobs: buf=%s | fd=%d\n", jobs->buf, jobs->fd);
-	}
+  if (m > 0) {
+    emsg("master send job: buf=%s | fd=%d\n", job->buf, job->fd);
+  }
 }
 
-
-#ifdef __MAIN__
-int main(void)
-{
-	int i, num_jobs;
-	process_pool pool;
-	Vec(Jobs) cq;
-	vec_init(&cq);
-
-	num_jobs = 10;
-	for (i = 0; i < num_jobs; i++) {
-		Jobs jobs = {"Yhm, Forever!", i};
-		vec_push(&cq, jobs);
-	}
-
-	printf("Master[%d] Runnig\n", getpid());
-
-
-	process_pool_init(&pool, 3);
-	process_pool_start(&pool);
-
-	for (i= 0; i < num_jobs; i++) {
-		process_pool_dispatch(&pool, &cq.data[i]);
-	}
-
-	wait(NULL);
-
-	vec_deinit(&cq);
-
-	return 0;
+void process_pool_end(process_pool *pool) {
 }
-#endif

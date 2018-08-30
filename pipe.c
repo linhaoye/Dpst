@@ -6,7 +6,7 @@ typedef struct _pipe {
   int fd[2];
 } _pipe;
 
-void pipe_open(pipe_t *pip, int blocking) {
+void pipe_open(pipe_t *pip, int block) {
   _pipe *_pipe = malloc(sizeof (*_pipe));
 
   if (_pipe == NULL) {
@@ -19,13 +19,13 @@ void pipe_open(pipe_t *pip, int blocking) {
     elog(0, "open pipe: pipe(%x): %s", _pipe->fd, strerror(ERRNO));
   }
 
-  if (blocking == 0) {
+  if (block == 0) {
     blockmode(_pipe->fd[0], O_NONBLOCK);
     blockmode(_pipe->fd[1], O_NONBLOCK);
   }
 
   pip->object = _pipe;
-  pip->blocking = blocking;
+  pip->block = block;
 
   return;
 }

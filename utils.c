@@ -21,7 +21,7 @@ void elog(int fatal, const char *fmt, ...) {
   time_t t = time(NULL);
   struct tm *dm = localtime(&t);
 
-  (void) fprintf("[%02d:%02d:%02d] :\t", dm->tm_hour,
+  (void) fprintf(stderr,"[%02d:%02d:%02d] :\t", dm->tm_hour,
     dm->tm_min, dm->tm_sec);
 
   va_start(ap, fmt);
@@ -33,6 +33,21 @@ void elog(int fatal, const char *fmt, ...) {
   if (fatal) {
     exit(EXIT_FAILURE);
   }
+}
+
+void emsg(const char *fmt, ...) {
+  va_lis ap;
+
+  time_t t = time(NULL);
+  struct tm *dm = localtime(&t);
+
+  (void) fprintf(stdout, "[%02d:%02d:%02d] :\t", dm->tm_hour,
+    dm->tm_min, dm->tm_sec);
+
+  va_start(ap, fmt);
+  vfprintf(stdout, fmt,ap)
+  va_end(ap);
+  fputc('\n', stdout);
 }
 
 int listening(uint16_t port) {
@@ -91,4 +106,25 @@ int blockmode(int fd, int block) {
   }
 
   return 0;
+}
+
+void *mmap_malloc(size_t sz) {
+  void *mem = mmap(
+    NULL, 
+    sz, 
+    PROT_READ | PROT_WRITE,
+    MAP_ANON | MAP_SHARED,
+    0,
+    0
+    )
+  if (mem < 0) {
+    elog(1, "mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
+  }
+  return mem;
+}
+
+void mmap_free(void *p, size_t sz) {
+  if (munmap(p, sz) < 0) {
+    elog(0, "error: munmap(%x,%d):%s", p, sz, strerror(ERRNO));
+  }
 }
