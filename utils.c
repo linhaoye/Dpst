@@ -116,7 +116,7 @@ void *mmap_malloc(size_t sz) {
     MAP_ANON | MAP_SHARED,
     0,
     0
-    )
+    );
   if (mem < 0) {
     elog(1, "mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
   }

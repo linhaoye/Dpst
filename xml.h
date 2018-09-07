@@ -11,6 +11,10 @@ enum {
 	J_ADDGATEWAY
 };
 
+struct Msg {
+	char *target;
+}
+
 char* create_xml(int type, Vec_string *v);
 void deinit_xml(char *s);
 

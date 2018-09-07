@@ -16,11 +16,16 @@
  */
 static struct {
   uint8_t process_type; //process type
-  int reloading; //
+  int reloading; 
   int whether_reload;
 } ctx;
 
-int *pool_status; //process pool status
+#define _PN 64 //how many pages
+
+/* memory allocation */
+static void* ptr; 
+static int ptr_offset;
+static mut_t ptr_lock;
 
 /* process tag */
 enum {
@@ -32,6 +37,49 @@ enum {
 typedef struct {
   int pipe[2];
 } Pipe;
+
+static void* set(void *data, int sz) {
+  MUT_LOCK(&ptr_lock);
+
+  void *p = ptr + ptr_offset;
+  int n = ptr_offset + sz;
+
+  if (n > (_PN * 1024)) {
+    return NULL;
+  }
+  ptr_offset = n;
+
+  if (data == NULL) {
+    memset(p, 0, sz);
+  } else {
+    memcpy (p, data, sz);
+  }
+
+  MUT_UNLOCK(&ptr_lock);
+
+  return p;
+}
+
+static void *get(int sz) {
+  MUT_LOCK(&ptr_lock);
+
+  void *p = ptr + ptr_offset;
+  ptr_offset += sz;
+
+  MUT_UNLOCK(&ptr_lock);
+
+  return p;
+}
+
+static void unset(void *data, int sz) {
+  MUT_LOCK(&ptr_lock);
+
+  if (data > ptr) {
+    memcpy(data, data + sz, (ptr_offset - (data - ptr) - sz))
+  }
+
+  MUT_UNLOCK(&ptr_lock);
+}
 
 static int spawn(process_pool *pool, int n) {
   int i, pid; 
@@ -58,10 +106,6 @@ static int spawn(process_pool *pool, int n) {
 static void sigusr1(int signo) {
   ctx.reloading = 1;
   ctx.whether_reload = 0;
-}
-
-static void sigterm(int signo) {
-  *pool_status = 0;
 }
 
 static void worker_process(process_pool *pool, int p) {
@@ -105,7 +149,7 @@ static void manager_process(process_pool *pool) {
       }
     }
 
-    if (*pool_status == 1) {
+    if (pool->server_status == 1) {
       for (i = 0; i < pool->num_workers; i++) {
         if (pid != pool->workers[i].pid) {
           continue;
@@ -134,26 +178,40 @@ clean:
   free(workers);
 }
 
-void process_pool_init(process_pool *pool, int num_workers) {
-  assert(pool != NULL);
+process_pool* process_pool_new(int num_workers) {
+  process_pool local;
+  memset(&local, 0, sizeof(local));
 
-  int *ptr = mmap_malloc(64*1024);
-  pool_status = ptr
+  local.num_workers = num_workers;
+  local.cur_wk = -1;
+  local.server_status = 0;
+  local.set = set;
+  local.unset = unset;
 
-  *pool_status = 1;
-  ctx.process_type = MASTER_PROCESS;
-
-  worker *workers;
-  int n = num_workers * sizeof(worker);
-
-  worker = malloc(n);
-  if (worker == NULL) {
-    elog(1, "init process pool: malloc(%d)", n, strerror(ERRNO));
+  process_pool * p = (process_pool *)set(&local, sizeof(local));
+  if (p == NULL) {
+    elog(1, "new process pool: set(%x, %d): %s", 
+      &local, sizeof(local), strerror(ERRNO));
   }
 
-  pool->workers = workers;
-  pool->num_workers = num_workers;
-  pool->cur_wk = -1;
+  worker *workers;
+  int n = num_workers * sizeof(*worker);
+
+  worker = (worker *)set(NULL, n);
+  if (worker == NULL) {
+    elog(1, "init process pool: set(NULL, %d): %s", 
+      n, strerror(ERRNO));
+  }
+
+  p->workers = workers;
+  return p;
+}
+
+void process_pool_envinit() {
+  ptr = mmap_malloc(_PN * 1024);
+  ptr_offset = 0;
+  ctx.process_type = MASTER_PROCESS;
+  MUT_INIT(&ptr_lock, 1);
 }
 
 void process_pool_start(process_pool *pool) {
@@ -217,4 +275,5 @@ void process_pool_dispatch(process_pool *pool, void *data) {
 }
 
 void process_pool_end(process_pool *pool) {
+  emsg("stop!!!");
 }
