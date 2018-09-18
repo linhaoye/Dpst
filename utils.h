@@ -1,6 +1,8 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include <stddef.h>
+
 void elog(int fatal, const char *fmt, ...);
 void emsg(const char *fmt, ...)
 int listening(uint16_t port);

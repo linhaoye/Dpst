@@ -23,7 +23,7 @@ typedef struct {
 } mut_t;
 
 #define MUT_INIT(M, T) do { \
-  memset(M, 0, size(*M)); \
+  memset(M, 0, sizeof(*M)); \
   if (T == 1) {\
     pthread_mutex_setpshared(&M->attr, PTHREAD_PROCESS_SHARED);\
   }\

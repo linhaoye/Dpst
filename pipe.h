@@ -1,6 +1,8 @@
 #ifndef __PIPE_H__
 #define __PIPE_H__
 
+#include <stddef.h>
+
 typedef struct {
   void *object;
   int block;
