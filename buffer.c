@@ -27,29 +27,102 @@ void buf_init(buffer_t *buf, size_t sz) {
 
   buf->data = data;
   buf->rdi = 0;
-  buf->wti = 0;
+  buf->wri = 0;
   buf->capacity = sz + 1;
 }
 
 int buf_write(buffer_t *buf, void* data, size_t n) {
-  if (buf_canwrite(buf, n) < 0) {
-    return -1;
+  if (buf_isfull(buf) == 0) {
+    return 1;
   }
-  memcpy(buf + buf->wti, data, n);
+
+  int sz, m;
+  if (buf->rdi <= buf->wri) {
+    sz = buf->capacity - (buf->wri - buf->rdi) - 1;
+    if (sz < n) {
+      return -1;
+    }
+
+    m = buf->capacity - buf->wri;
+    if (n < m) {
+      memcpy(buf->data + buf->wri, data, n);
+      buf->wri = (buf->wri + n) % buf->capacity;
+    } else {
+      memcpy(buf->data + buf->wri, data, m);
+      buf->wri = (buf->wri + m) % buf->capacity;
+
+      memcpy(buf->data + buf->wri, data, n - m)
+      buf->wri = (buf->wri + n - m) % buf->capacity;
+    }
+  } else {
+    sz = buf->rdi - buf->wri - 1;
+    if (sz < n) {
+      return -1;
+    }
+
+    memcpy(buf->data + buf->wri, data, n);
+    buf->wri = (buf->wri + n) % buf->capacity;
+  }
 
   return 0;
 }
 
 int buf_read(buffer_t *buf, void* data, size_t n) {
-  if (buf_canread(buf, n) < 0) {
+  if (buf_isempty(buf) == 0){
     return -1;
   }
 
+  int sz, m;
+  if (buf->wri <= buf->rdi) {
+    sz = buf->capacity - (buf->rdi - buf->wri) - 1;
+    if (sz < n) {
+      return -1;
+    }
+    m = buf->capacity - buf->rdi;
+    if (n < m) {
+      memcpy(data, buf->data + buf->rdi, n);
+      buf->rdi = (buf->rdi + n) % buf->capacity;
+    } else {
+      memcpy(data, buf->data + buf->rdi, m);
+      buf->rdi = (buf->rdi + m) % buf->capacity;
 
+      memcpy(data + m, buf->data + buf->rdi, n - m);
+      buf->rdi = (buf->rdi + n -m) % buf->capacity;
+    }
+  } else {
+    sz = buf->wri - buf->rdi;
+    if (sz < n) {
+      return -1;
+    }
+    memcpy(data, buf->data + buf->rdi, n);
+    buf->rdi = (buf->rdi + n) % buf->capacity;
+  }
 
   return 0;
 }
 
+void buf_clear(buffer_t *buf) {
+  buf->wri = buf->rdi = 0;
+}
+
+int buf_isempty(buffer_t *buf) {
+  return buf->wri == buf->rdi ? 0 : -1;
+}
+
 int buf_isfull(buffer_t *buf) {
-  return ;
+  return (buf->wri + 1) % buf->capacity == buf->rdi ? 0 : -1;
+}
+
+void buf_deinit(buffer_t *buf) {
+  if (buf->data) {
+    free(buf->data);
+  }
+  memset(buf, 0, sizeof(*buf));
+}
+
+void buf_free(buffer_t *buf) {
+  if (buf) {
+    buf_deinit(buf);
+    free(buf);
+  }
 }

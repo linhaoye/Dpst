@@ -51,7 +51,7 @@ typedef struct {
 void process_pool_envinit();
 process_pool* process_pool_new(int num_workers);
 void process_pool_start(process_pool *pool);
-void process_pool_dispatch(process_pool *pool, void *data)
+void process_pool_dispatch(process_pool *pool, void *data);
 void process_pool_end(process_pool *pool);
 
 #endif
