@@ -79,6 +79,16 @@ tlv_unpack(tlv_t *tlv, uint8_t *packed,  uint32_t sz) {
   return b;
 }
 
+uint32_t 
+tlv_get_packed_size(tlv_t *tlv) {
+  uint32_t pack_sz = 0;
+  
+  pack_sz = sizeof(tlv_t) - sizeof(uint8_t*);
+  pack_sz += tlv->length;
+
+  return pack_sz;
+}
+
 int 
 pack_value (tlv_t *tlv, void *outbuf, uint32_t *out_sz) {
   if (NULL == tlv || NULL == outbuf || NULL == out_sz) {

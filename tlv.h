@@ -6,9 +6,9 @@
 
 #define S(s)       #s
 #define STR(s)     S(s)
-#define UINT8P(p)  ((uint8_t *)(p))
-#define UINT16P(p) ((uint16_t *)(p))
-#define UINT32P(p) ((uint32_t *)(p))
+#define UINT8P(p)  ((uint8_t*)(p))
+#define UINT16P(p) ((uint16_t*)(p))
+#define UINT32P(p) ((uint32_t*)(p))
 
 #define PACKED __attribute__((packed))
 
@@ -25,20 +25,20 @@
 #define ADVANCE32P(p) p = (UINT32P(UINT32P(p)) + 1)
 
 typedef struct {
-	uint16_t id;
-	uint16_t type;
-	uint16_t length;
-	uint8_t *value;
+  uint16_t id;
+  uint16_t type;
+  uint16_t length;
+  uint8_t *value;
 } PACKED tlv_t;
 
 typedef enum {
-	TLV_TYPE_INT8 = 1,
-	TLV_TYPE_UINT8,
-	TLV_TYPE_INT16,
-	TLV_TYPE_UINT16,
-	TLV_TYPE_INT32,
-	TLV_TYPE_UINT32,
-	TLV_TYPE_BYTES
+  TLV_TYPE_INT8 = 1,
+  TLV_TYPE_UINT8,
+  TLV_TYPE_INT16,
+  TLV_TYPE_UINT16,
+  TLV_TYPE_INT32,
+  TLV_TYPE_UINT32,
+  TLV_TYPE_BYTES
 } tlv_type_t;
 
 tlv_t* tlv_new(uint16_t id, tlv_type_t type, uint16_t length, uint8_t *value);
