@@ -232,7 +232,7 @@ void process_pool_start(process_pool *pool) {
 
   pid = fork();
   if (pid == -1) {
-    elog(1, "start process pool: fork()", strerror(ERRNO));
+    elog(1, "start process pool: fork():%s", strerror(ERRNO));
   } else if (pid == 0) {
     for (i = 0; i < p->num_workers; i++) {
       close(pipes[i].pipe[0]);
@@ -242,7 +242,7 @@ void process_pool_start(process_pool *pool) {
       pid = spawn(pool, i);
 
       if (pid < 0) {
-        elog(0, "start process pool: spawn(%x, %d)", pool, i strerror(ERRNO));
+        elog(0, "start process pool: spawn(%x, %d): %s", pool, i, strerror(ERRNO));
         return;
       } else {
         p->workers[i].pid = pid;
