@@ -117,7 +117,7 @@ static void worker_process(process_pool *pool, int p) {
   while (1) {
     n = read(p, &jobs, sizeof(job_t));
     if (n > 0) {
-      emsg("worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
+      elog(0, "worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
     }
   }
 }
@@ -270,10 +270,10 @@ void process_pool_dispatch(process_pool *pool, void *data) {
   m = write(pool->workers[n].pipe_fd, job, sizeof(job_t));
 
   if (m > 0) {
-    emsg("master send job: buf=%s | fd=%d\n", job->buf, job->fd);
+    elog(0, "master send job: buf=%s | fd=%d\n", job->buf, job->fd);
   }
 }
 
 void process_pool_end(process_pool *pool) {
-  emsg("stop!!!");
+  elog(0, "stop!!!");
 }

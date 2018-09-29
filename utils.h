@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 void elog(int fatal, const char *fmt, ...);
-void emsg(const char *fmt, ...)
 int listening(uint16_t port);
 int blockmode(int fd, int block);
 void *mmap_malloc(size_t sz);

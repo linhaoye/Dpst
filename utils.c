@@ -12,7 +12,7 @@
 void elog(int fatal, const char *fmt, ...) {
   va_list ap;
 
-#if 1
+#if defined(_NDEDUG)
   if (!fatal) { /* Do not show debug message */
     return;
   }
@@ -35,24 +35,44 @@ void elog(int fatal, const char *fmt, ...) {
   }
 }
 
-void emsg(const char *fmt, ...) {
-  va_lis ap;
+int listen_s0(int port, uint32_t addr, int backlog) {
+  int fd, sz = 1;
+  struct sockaddr_in sin;
 
-  time_t t = time(NULL);
-  struct tm *dm = localtime(&t);
+  if ((fd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+    return -1;
+  }
 
-  (void) fprintf(stdout, "[%02d:%02d:%02d] :\t", dm->tm_hour,
-    dm->tm_min, dm->tm_sec);
+  blockmode(fd, 0);
+  setsocketopt(fd, SOL_SOCKET, SO_REUSEADDR, &sz, sizoef(sz));
 
-  va_start(ap, fmt);
-  vfprintf(stdout, fmt,ap)
-  va_end(ap);
-  fputc('\n', stdout);
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(port);
+  sin.sin_addr.s_addr = htonl(addr);
+
+  if (bind(fd, (struct sockaddr*)&sin, sizoef(sin)) < 0) {
+    return -1;
+  }
+  if (listen(fd, backlog) < 0){
+    return -1;
+  }
+
+  return fd;
 }
 
-int listening(uint16_t port) {
+int listen_s1(uint16_t port) {
   int sock, on =1, af;
-  struct sa sa;
+
+  struct {
+      socklen_t   len;
+      union {
+          struct sockaddr     sa;
+          struct sockaddr_in  sin;
+      } u;
+  #ifdef WITH_IPV6
+          struct sockaddr_in6 sin6;
+  #endif /* WITH_IPV6 */
+  } sa;
 
 #ifdef WITH_IPV6
   af = PF_INET6;
