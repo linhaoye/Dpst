@@ -1,55 +1,62 @@
-#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include "platform.h"
 #include "utils.h"
 #include "pipe.h"
 
-typedef struct _pipe {
+typedef struct {
   int fd[2];
-} _pipe;
+} mypipe;
 
 void pipe_open(pipe_t *pip, int block) {
-  _pipe *_pipe = malloc(sizeof (*_pipe));
+  mypipe *mypipe = malloc(sizeof (*mypipe));
 
-  if (_pipe == NULL) {
-    elog(0, "open pipe: malloc(%d): %s", sizeof(*_pipe), strerror(ERRNO));
+  if (mypipe == NULL) {
+    elog(0, "open pipe: malloc(%d): %s", sizeof(*mypipe), strerror(ERRNO));
   }
 
-  memset(_pipe, 0, sizeof (*_pipe));
+  memset(mypipe, 0, sizeof (*mypipe));
 
-  if (pipe(_pipe->fd) < 0) {
-    elog(0, "open pipe: pipe(%x): %s", _pipe->fd, strerror(ERRNO));
+#ifdef _WIN32
+  if (_pipe(mypipe->fd, sizeof(mypipe->fd), 0) < 0)
+#else
+  if (pipe(mypipe->fd) < 0) 
+#endif
+  {
+    elog(0, "open pipe: pipe(%x): %s", mypipe->fd, strerror(ERRNO));
   }
 
   if (block == 0) {
-    blockmode(_pipe->fd[0], O_NONBLOCK);
-    blockmode(_pipe->fd[1], O_NONBLOCK);
+    blockmode(mypipe->fd[0], 1);
+    blockmode(mypipe->fd[1], 1);
   }
 
-  pip->object = _pipe;
+  pip->object = mypipe;
   pip->block = block;
 
   return;
 }
 
 int pipe_read(pipe_t *pip, void *data, size_t sz) {
-  _pipe *p = pip->object;
+  mypipe *p = pip->object;
 
   return read(p->fd[0], data, sz);
 }
 
 int pipe_write(pipe_t *pip, void *data, size_t sz) {
-  _pipe *p = pip->object;
+  mypipe *p = pip->object;
 
   return write(p->fd[1], data, sz);
 }
 
 int pipe_fd(pipe_t *pip, int type) {
-  _pipe *p = pip->object;
+  mypipe *p = pip->object;
 
   return type == 0 ? p->fd[0] : p->fd[1];
 }
 
 void pipe_close(pipe_t *pip) {
-  _pipe *p = pip->object;
+  mypipe *p = pip->object;
 
   close(p->fd[0]);
   close(p->fd[1]);

@@ -1,13 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <time.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 #include <error.h>
 #include "utils.h"
+#include "platform.h"
 
 void elog(int fatal, const char *fmt, ...) {
   va_list ap;
@@ -44,13 +41,13 @@ int listen_s0(int port, uint32_t addr, int backlog) {
   }
 
   blockmode(fd, 0);
-  setsocketopt(fd, SOL_SOCKET, SO_REUSEADDR, &sz, sizoef(sz));
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&sz, sizeof(sz));
 
   sin.sin_family = AF_INET;
   sin.sin_port = htons(port);
   sin.sin_addr.s_addr = htonl(addr);
 
-  if (bind(fd, (struct sockaddr*)&sin, sizoef(sin)) < 0) {
+  if (bind(fd, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
     return -1;
   }
   if (listen(fd, backlog) < 0){
@@ -81,7 +78,7 @@ int listen_s1(uint16_t port) {
 #endif
 
   blockmode(sock, 0);
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADD, (char*)&on, sizeof(on));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on));
 
 #ifdef WITH_IPV6
   sa.u.sin.sin6_family = af;
@@ -105,6 +102,11 @@ int listen_s1(uint16_t port) {
 }
 
 int blockmode(int fd, int block) {
+#ifdef _WIN32
+  unsigned long on = !block;
+
+  return ioctlsocket(fd, FIONBIO, &on);
+#else
   int flags;
 
   if ((flags = fcntl(fd,  F_GETFL, 0)) == -1) {
@@ -126,9 +128,13 @@ int blockmode(int fd, int block) {
   }
 
   return 0;
+#endif
 }
 
-void *mmap_malloc(size_t sz) {
+void *s_malloc(size_t sz) {
+#ifdef _WIN32
+  return NULL;
+#else
   void *mem = mmap(
     NULL, 
     sz, 
@@ -141,10 +147,15 @@ void *mmap_malloc(size_t sz) {
     elog(1, "mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
   }
   return mem;
+#endif
 }
 
-void mmap_free(void *p, size_t sz) {
+void s_free(void *p, size_t sz) {
+#ifdef _WIN32
+  return;
+#else
   if (munmap(p, sz) < 0) {
     elog(0, "error: munmap(%x,%d):%s", p, sz, strerror(ERRNO));
   }
+#endif
 }

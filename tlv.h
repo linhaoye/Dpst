@@ -1,7 +1,6 @@
 #ifndef __TLV_H__
 #define __TLV_H__
 
-#include <stddef.h>
 #include <stdint.h>
 
 #define S(s)       #s
@@ -20,9 +19,9 @@
 #define GET16(p) (*UINT16P(p))
 #define GET32(p) (*UINT32P(p))
 
-#define ADVANCE8P(p)  p = (UINT8P(UINT8P(p)) + 1)
-#define ADVANCE16P(p) p = (UINT16P(UINT16P(p)) + 1)
-#define ADVANCE32P(p) p = (UINT32P(UINT32P(p)) + 1)
+#define ADVANCE8P(p)  p = (UINT8P(UINT8P(p) + 1))
+#define ADVANCE16P(p) p = (UINT8P(UINT16P(p) + 1))
+#define ADVANCE32P(p) p = (UINT8P(UINT32P(p) + 1))
 
 typedef struct {
   uint16_t id;

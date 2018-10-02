@@ -3,7 +3,7 @@
 
 typedef struct {
   int memberid;
-  char loginname[50];
+  char username[50];
   char password[32];
   char address1[128];
   char address2[128];
@@ -12,7 +12,7 @@ typedef struct {
   char city[30];
   char pin[30];
   char profession[60];
-  int ipadd;
+  int ipaddr;
   char phone1[30];
 } member_info;
 

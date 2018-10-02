@@ -1,7 +1,7 @@
 #ifndef __SELECT_H__
 #define __SELECT_H__
 
-#include <sys/select.h>
+#include "platform.h"
 
 enum {
   SELECT_READ,

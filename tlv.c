@@ -1,9 +1,27 @@
 #include <string.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
 #include <assert.h>
+#include "platform.h"
 #include "tlv.h"
-#include "util.h"
+#include "utils.h"
+
+int pack_value (tlv_t *tlv, void *outbuf, uint32_t *out_sz);
+
+int unpack_value(tlv_type_t type, uint16_t id, void *inbuf, uint16_t length, tlv_t *out_tlv);
+
+int validate_tlv_len(tlv_type_t type, uint32_t length);
+
+int pack_int8(uint8_t *int8, uint8_t *outbuf, uint32_t *out_sz);
+
+int pack_int16(uint16_t *int16, uint16_t *outbuf, uint32_t *out_sz);
+
+int unpack_int16(uint16_t *int16, uint16_t *outbuf, uint32_t *out_sz);
+
+int pack_int32(uint32_t *int32, uint32_t *outbuf, uint32_t *out_sz);
+
+int unpack_int32(uint32_t *int32, uint32_t *outbuf, uint32_t *out_sz);
+
+int pack_bytes(void *inbuf, uint32_t in_sz, void *outbuf, int32_t *out_sz);
 
 tlv_t* 
 tlv_new(uint16_t id, tlv_type_t type, 
@@ -48,9 +66,9 @@ tlv_pack(tlv_t *tlv, uint8_t *out, uint32_t out_sz) {
   ADVANCE16P(out);
   PUT16(out, htons(tlv->length));
   ADVANCE16P(out);
-  pack_sz -= sizeof(uint16_t) * 3
+  pack_sz -= sizeof(uint16_t) * 3;
 
-  return pack_value(tlv, out, &pack_sz)
+  return pack_value(tlv, out, &pack_sz);
 }
 
 int 
@@ -59,7 +77,7 @@ tlv_unpack(tlv_t *tlv, uint8_t *packed,  uint32_t sz) {
     return -1;
   }
 
-  uint8_t  *p = packed;
+  uint8_t *p = packed;
   uint16_t id = 0, type = 0, length = 0;
   int b = 0;
 
@@ -203,7 +221,7 @@ validate_tlv_len(tlv_type_t type, uint32_t length) {
     break;
 
   default:
-    b = -1
+    b = -1;
     break;
   }
   return b;

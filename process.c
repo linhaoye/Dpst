@@ -208,7 +208,7 @@ process_pool* process_pool_new(int num_workers) {
 }
 
 void process_pool_envinit() {
-  ptr = mmap_malloc(_PN * 1024);
+  ptr = s_malloc(_PN * 1024);
   ptr_offset = 0;
   ctx.process_type = MASTER_PROCESS;
   MUT_INIT(&ptr_lock, 1);

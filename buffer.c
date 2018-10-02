@@ -16,10 +16,12 @@ buffer_t* buf_new(size_t sz) {
 
 void buf_init(buffer_t *buf, size_t sz) {
   assert(buf != NULL);
+  
+  char *data = NULL;
   memset(buf, 0, sizeof(*buf));
 
   if (buf->data == NULL) {
-    char *data = calloc(sz + 1, 1);
+    data = calloc(sz + 1, 1);
     if (data == NULL) {
       elog(1, "fatal error: calloc(%d, %d)", sz, sizeof(char));
     }
@@ -51,7 +53,7 @@ int buf_write(buffer_t *buf, void* data, size_t n) {
       memcpy(buf->data + buf->wri, data, m);
       buf->wri = (buf->wri + m) % buf->capacity;
 
-      memcpy(buf->data + buf->wri, data, n - m)
+      memcpy(buf->data + buf->wri, data, n - m);
       buf->wri = (buf->wri + n - m) % buf->capacity;
     }
   } else {
