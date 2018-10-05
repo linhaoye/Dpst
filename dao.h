@@ -12,7 +12,7 @@ typedef struct {
   char city[30];
   char pin[30];
   char profession[60];
-  int ipaddr;
+  char ipaddr[15];
   char phone1[30];
 } member_info;
 
@@ -21,11 +21,18 @@ typedef struct {
   int friendid;
 } friend_info;
 
+typedef struct {
+  char username_a[50];
+  char ipaddr[15];
+} friend_list;
+
 void dao_init();
 void dao_deinit();
 
 int dao_add_member(member_info *member);
 int dao_add_friend(friend_info *friend);
+int dao_get_members(member_info **member, int limit);
+int dao_get_friends();
 
 
 #endif

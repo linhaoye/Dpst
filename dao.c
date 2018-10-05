@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <assert.h>
 #include "sqlite3.h"
 #include "dao.h"
 
@@ -28,6 +30,86 @@ void dao_init() {
 void dao_deinit() {
   sqlite3_close(db);
   sqlite3_shutdonw();
+}
+
+int dao_login(const char* username, 
+              const char* password,
+              const char* ip_addr) {
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0;
+  int idx = -1;
+  int id;
+
+  char *sql = "select member_id from tbl_member where \
+    username=:username and password=:password limit 1";
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+    return -1;
+  }
+
+# define SQLBIND(param) \
+  idx = sqlite3_bind_parameter_index(stmt, ":" STR(param)); \
+  sqlite3_bind_text(stmt, idx, param, -1, SQLITE_STATIC)
+
+  SQLBIND(username);
+  SQLBIND(password);
+
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    id = sqlite3_column_int(stmt, 0);
+    break;
+  }
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+  sql = "update tbl_member set ip_addr=:ip_addr where username=:username";
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+    return -1;
+  }
+
+  SQLBIND(ip_addr);
+  SQLBIND(username);
+
+  rc = sqlite3_step(stmt);
+  if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+    return -1;
+  }
+  if (id < 0) {
+    return 1;
+  }
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+  
+  return 0;  
+}
+
+int dao_logout(const char *username, const char *ip) {
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0, idx = -1;
+  char *sql = "update tbl_member set ipaddr=:ip where username=:u";
+
+  rc = sqlite3_prepare_v2(stmt, sql, -1, NULL);
+  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+    return -1;
+  }
+
+  idx = sqlite3_bind_parameter_index(stmt, ":ip");
+  sqlite3_bind_text(stmt, idx, ip, SQLITE_STATIC);
+
+  idx = sqlite3_bind_parameter_index(stmt, ":u");
+  sqlite3_bind_text(stmt, idx, username, SQLITE_STATIC);
+
+  if ((sqlite3_step(stmt) != SQLITE_DONE)) {
+    return -1;
+  }
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+
+  return 0;
 }
 
 int dao_add_member(member_info *member) {
@@ -114,4 +196,67 @@ int dao_add_friend(friend_info *friend) {
   stmt = NULL;
 
   return 0;
+}
+
+friend_list **list;
+
+int dao_get_friends(const char* username, friend_list ***list, int *sz) {
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0, idx = -1, n = 20, i = 0, buf_len = 0;
+  const char* buf = NULL;
+
+  char *sql = "select username_a, ip_addr from tbl_friend_list \
+    where username=:u";
+
+  friend_list **mylist = malloc(n * sizeof(*list));
+  if (mylist == NULL) {
+    return -1;
+  }
+
+  rc = sqlite3_prepare_v2(stmt, sql, -1, NULL);
+  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+    return -1;
+  }
+
+  idx = sqlite3_bind_parameter_index(stmt, ":u");
+  sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
+
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    friend_list *item = malloc(sizeof(*item));
+    if (item == NULL) {
+      return -1;
+    }
+
+    buf = (const char*)sqlite3_column_text(stmt, 0);
+    len = sqlite3_column_bytes(stmt, 0);
+    memcpy(item->username_a, buf, len);
+
+    buf = (const char*)sqlite3_column_text(stmt, 1);
+    len = sqlite3_column_bytes(stmt, 1);
+    memcpy(item->ipaddr, buf, len);
+
+    mylist[i++] = item;
+
+    if (n > i) {
+      n = (n << 1);
+      friend_list **nmylist= realloc(mylist, n);
+      if (nmylist == NULL) {
+        return -1;
+      }
+      mylist = nmylist;
+    }
+  }
+
+  *sz = i;
+  *list = mylist;
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+
+  return 0;
+}
+
+void dao_free_friends_result(friend_list ***list) {
+  assert(list);
+  free(*list);
 }
