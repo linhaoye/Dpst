@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "sqlite3.h"
 #include "dao.h"
+#include "debug.h"
 
 #undef  S
 #undef  STR
@@ -34,17 +35,18 @@ void dao_deinit() {
 
 int dao_login(const char* username, 
               const char* password,
-              const char* ip_addr) {
+              const char* ipaddr) {
   sqlite3_stmt *stmt = NULL;
   int rc = 0;
   int idx = -1;
   int id;
 
-  char *sql = "select member_id from tbl_member where \
+  char *sql = "select memberid from tbl_member where \
     username=:username and password=:password limit 1";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -63,18 +65,20 @@ int dao_login(const char* username,
 
   sqlite3_finalize(stmt);
   stmt = NULL;
-  sql = "update tbl_member set ip_addr=:ip_addr where username=:username";
+  sql = "update tbl_member set ipaddr=:ipaddr where username=:username";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
-  SQLBIND(ip_addr);
+  SQLBIND(ipaddr);
   SQLBIND(username);
 
   rc = sqlite3_step(stmt);
   if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
   if (id < 0) {
@@ -94,6 +98,7 @@ int dao_logout(const char *username, const char *ip) {
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -104,6 +109,7 @@ int dao_logout(const char *username, const char *ip) {
   sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
 
   if ((sqlite3_step(stmt) != SQLITE_DONE)) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -116,7 +122,7 @@ int dao_logout(const char *username, const char *ip) {
 int dao_add_member(member_info *member) {
   sqlite3_stmt *stmt = NULL;
   int rc = 0, idx = -1;
-  char* sql = "insert into tbl_member ("
+  char *sql = "insert into tbl_member ("
     "username,"
     "password," 
     "address1," 
@@ -143,6 +149,7 @@ int dao_add_member(member_info *member) {
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 # undef SQLBIND
@@ -164,6 +171,7 @@ int dao_add_member(member_info *member) {
 
   rc = sqlite3_step(stmt);
   if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -212,11 +220,13 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
 
   friend_list **mylist = malloc(n * sizeof(*list));
   if (mylist == NULL) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -239,7 +249,7 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
 
     mylist[i++] = item;
 
-    if (n > i) {
+    if (i > n) {
       n = (n << 1);
       friend_list **nmylist= realloc(mylist, n);
       if (nmylist == NULL) {
@@ -258,7 +268,13 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
   return 0;
 }
 
-void dao_free_friends_result(friend_list ***list) {
+void dao_free_friends_result(friend_list **list, int sz) {
   assert(list);
-  free(*list);
+  int i;
+  for (i = 0; i < sz; i++) {
+    if (list[i]) {
+      free(list[i]);
+    }
+  }
+  free(list);
 }

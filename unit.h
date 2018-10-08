@@ -9,29 +9,29 @@
 #define ph_suite_start() char *message = NULL
 
 #define ph_assert(test, message) if (!(test)) {\
-	ph_log_err(message);\
-	return message;\
+  ph_log_err(message);\
+  return message;\
 }
 
 #define ph_run_test(test) ph_debug("\n-----%s", " " #test); \
-	message = test();\
-	tests_run++;\
-	if (message) {\
-		return message;\
-	}
+  message = test();\
+  tests_run++;\
+  if (message) {\
+    return message;\
+  }
 
 #define PH_RUN_TESTS(name) int main(int argc, char *argv[]) {\
-	argc = 1; \
-	ph_debug("----- RUNNING: %s", argv[0]); \
-	printf("----\nRUNNING: %s\n", argv[0]); \
-	char *result = name(); \
-	if (result != 0) { \
-		printf("FAILED: %s\n", result); \
-	} else { \
-		printf("ALL TEST PASSED\n"); \
-	} \
-	printf("Tests run: %d\n", tests_run); \
-	exit(result != 0);\
+  argc = 1; \
+  ph_debug("----- RUNNING: %s", argv[0]); \
+  printf("----\nRUNNING: %s\n", argv[0]); \
+  char *result = name(); \
+  if (result != 0) { \
+    printf("FAILED: %s\n", result); \
+  } else { \
+    printf("ALL TEST PASSED\n"); \
+  } \
+  printf("Tests run: %d\n", tests_run); \
+  exit(result != 0);\
 }
 
 

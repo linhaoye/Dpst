@@ -1,7 +1,7 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
-#include <stddef.h>
+#include <stdint.h>
 
 #ifndef __cplusplus
 typedef int bool;
