@@ -32,7 +32,6 @@ void dao_deinit();
 int dao_add_member(member_info *member);
 int dao_add_friend(friend_info *friend);
 int dao_get_members(member_info **member, int limit);
-int dao_get_friends();
-
+int dao_get_friends(const char* username, friend_list ***list, int *sz);
 
 #endif

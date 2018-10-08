@@ -11,7 +11,7 @@
 #define STR(s) S(s)
 
 static sqlite3 *db = NULL;
-static char* file = ""; /* default to temp db */
+static char* file = "./s.db"; /* default to temp db */
 
 void dao_init() {
   sqlite3_initialize();
@@ -29,7 +29,7 @@ void dao_init() {
 
 void dao_deinit() {
   sqlite3_close(db);
-  sqlite3_shutdonw();
+  sqlite3_shutdown();
 }
 
 int dao_login(const char* username, 
@@ -44,10 +44,11 @@ int dao_login(const char* username,
     username=:username and password=:password limit 1";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  if (rc != SQLITE_OK) {
     return -1;
   }
 
+# undef SQLBIND
 # define SQLBIND(param) \
   idx = sqlite3_bind_parameter_index(stmt, ":" STR(param)); \
   sqlite3_bind_text(stmt, idx, param, -1, SQLITE_STATIC)
@@ -65,7 +66,7 @@ int dao_login(const char* username,
   sql = "update tbl_member set ip_addr=:ip_addr where username=:username";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  if (rc != SQLITE_OK) {
     return -1;
   }
 
@@ -91,16 +92,16 @@ int dao_logout(const char *username, const char *ip) {
   int rc = 0, idx = -1;
   char *sql = "update tbl_member set ipaddr=:ip where username=:u";
 
-  rc = sqlite3_prepare_v2(stmt, sql, -1, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
     return -1;
   }
 
   idx = sqlite3_bind_parameter_index(stmt, ":ip");
-  sqlite3_bind_text(stmt, idx, ip, SQLITE_STATIC);
+  sqlite3_bind_text(stmt, idx, ip, -1, SQLITE_STATIC);
 
   idx = sqlite3_bind_parameter_index(stmt, ":u");
-  sqlite3_bind_text(stmt, idx, username, SQLITE_STATIC);
+  sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
 
   if ((sqlite3_step(stmt) != SQLITE_DONE)) {
     return -1;
@@ -141,12 +142,13 @@ int dao_add_member(member_info *member) {
     ")";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  if (rc != SQLITE_OK) {
     return -1;
   }
+# undef SQLBIND
 # define SQLBIND(param) \
   idx = sqlite3_bind_parameter_index(stmt, ":" STR(param));\
-  sqlite3_bind_text(stmt, idx, member.param, -1, SQLITE_STATIC)
+  sqlite3_bind_text(stmt, idx, member->param, -1, SQLITE_STATIC)
 
   SQLBIND(username);
   SQLBIND(password);
@@ -177,15 +179,15 @@ int dao_add_friend(friend_info *friend) {
   char *sql = "insert into tbl_friend(memberid, friendid) values(:mid, :fid)";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  if (rc != SQLITE_OK) {
     return -1;
   }
 
   idx = sqlite3_bind_parameter_index(stmt, ":mid");
-  sqlite3_bind_text(stmt, idx, friend.memberid, -1, SQLITE_STATIC);
+  sqlite3_bind_int(stmt, idx, friend->memberid);
 
   idx = sqlite3_bind_parameter_index(stmt, ":fid");
-  sqlite3_bind_text(stmt, idx, friend.friendid, -1, SQLITE_STATIC);
+  sqlite3_bind_int(stmt, idx, friend->friendid);
 
   rc = sqlite3_step(stmt);
   if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
@@ -205,7 +207,7 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
   int rc = 0, idx = -1, n = 20, i = 0, buf_len = 0;
   const char* buf = NULL;
 
-  char *sql = "select username_a, ip_addr from tbl_friend_list \
+  char *sql = "select username_a, ipaddr from tbl_friend_list \
     where username=:u";
 
   friend_list **mylist = malloc(n * sizeof(*list));
@@ -213,8 +215,8 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
     return -1;
   }
 
-  rc = sqlite3_prepare_v2(stmt, sql, -1, NULL);
-  if (rc != SQLITE_OK && rc != SQLITE_STATIC) {
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
     return -1;
   }
 
@@ -228,12 +230,12 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
     }
 
     buf = (const char*)sqlite3_column_text(stmt, 0);
-    len = sqlite3_column_bytes(stmt, 0);
-    memcpy(item->username_a, buf, len);
+    buf_len = sqlite3_column_bytes(stmt, 0);
+    memcpy(item->username_a, buf, buf_len);
 
     buf = (const char*)sqlite3_column_text(stmt, 1);
-    len = sqlite3_column_bytes(stmt, 1);
-    memcpy(item->ipaddr, buf, len);
+    buf_len = sqlite3_column_bytes(stmt, 1);
+    memcpy(item->ipaddr, buf, buf_len);
 
     mylist[i++] = item;
 
