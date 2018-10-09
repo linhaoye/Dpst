@@ -1,9 +1,39 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <assert.h>
 #include "dao.h"
 #include "unit.h"
 
+void rand_str(char *buf, int len) {
+  assert(buf);
+  int i, flag;
+  srand((unsigned) time(NULL));
+
+  for (i = 0; i < len -1; i++) {
+    flag = rand() % 3;
+    switch (flag) {
+    case 0:
+      buf[i] = 'A' + rand() % 26;
+      break;
+    case 1:
+      buf[i] = 'a' + rand() % 26;
+      break;
+    case 2:
+      buf[i] = '0' + rand() % 10;
+      break;
+    default:
+      buf[i] = 'x';
+      break;
+    }
+  }
+  buf[len - 1] = '\0';
+}
+
 char *dao_add_member_tests() {
   dao_init();
+  char buf[16];
   member_info mb = {
     -1,
     "hello,world!",
@@ -18,6 +48,8 @@ char *dao_add_member_tests() {
     "255.255.255.255",
     "183293283828"
   };
+  rand_str(buf, 16);
+  strcpy(mb.username, buf);
   dao_add_member(&mb);
   dao_deinit();
   return NULL;
@@ -59,12 +91,9 @@ char *dao_get_friends_test() {
         list[i]->username_a, list[i]->ipaddr);
     }
   }
-    for (i = 0; i < sz; i++) {
-    if (list[i]) {
-      free(list[i]);
-    }
-  }
-  free(list);
+  dao_free_friends_result(list, sz);
+  list = NULL;
+
   dao_deinit();
   return NULL;
 }

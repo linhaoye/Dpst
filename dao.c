@@ -12,7 +12,7 @@
 #define STR(s) S(s)
 
 static sqlite3 *db = NULL;
-static char* file = "./s.db"; /* default to temp db */
+static char* file = "./s.db"; /* if empty, default to temp db */
 
 void dao_init() {
   sqlite3_initialize();
@@ -181,6 +181,92 @@ int dao_add_member(member_info *member) {
   return 0;
 }
 
+int dao_get_onemb(const char *username, member_info *member) {
+  assert(member != NULL);
+  memset(member, 0, sizeof(*member));
+
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0, idx = -1;
+  char *sql = "select memberid,"
+    "username,"
+    "password,"
+    "address1,"
+    "address2,"
+    "email1,"
+    "email2,"
+    "city,"
+    "pin,"
+    "profession,"
+    "ipaddr,"
+    "phone1 from tbl_member where username=:u limit 1";
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+      ph_debug("%s\n", sqlite3_errmsg(db));
+      return -1;
+    }
+
+  idx = sqlite3_bind_parameter_index(stmt, ":u");
+  sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
+
+  if ((rc = sqlite3_step(stmt)) != SQLITE_ROW) {
+    if (rc != SQLITE_DONE) {
+      ph_debug("%s\n", sqlite3_errmsg(db));
+    }
+    return -1;
+  }
+
+  const char *buf = NULL;
+  int buf_len = 0;
+
+  member->memberid = sqlite3_column_int(stmt, 0);
+
+# undef EXTRA_TEXT
+# define EXTRA_TEXT(field, pos) \
+  buf = (const char*)sqlite3_column_text(stmt, pos); \
+  buf_len = sqlite3_column_bytes(stmt, pos); \
+  memcpy(member->field, buf, buf_len)
+
+  EXTRA_TEXT(username, 1);
+  EXTRA_TEXT(password, 2);
+  EXTRA_TEXT(address1, 3);
+  EXTRA_TEXT(address2, 4);
+  EXTRA_TEXT(email1, 5);
+  EXTRA_TEXT(email2, 6);
+  EXTRA_TEXT(city, 7);
+  EXTRA_TEXT(pin, 8);
+  EXTRA_TEXT(profession, 9);
+  EXTRA_TEXT(ipaddr, 10);
+  EXTRA_TEXT(phone1, 11);
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+
+  return 0;
+}
+
+int dao_delete_member(const char* username) {
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0, idx = -1;
+  char *sql = "delete from tbl_member where username=:u";
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+
+  idx = sqlite3_bind_parameter_index(stmt, ":u");
+  sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
+
+  rc = sqlite3_step(stmt);
+  if ( rc != SQLITE_ROW && rc != SQLITE_DONE) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+  return 0;
+}
+
 int dao_add_friend(friend_info *friend) {
   sqlite3_stmt *stmt = NULL;
   int rc = 0, idx = -1;
@@ -188,6 +274,7 @@ int dao_add_friend(friend_info *friend) {
 
   rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
   if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
   }
 
@@ -208,7 +295,40 @@ int dao_add_friend(friend_info *friend) {
   return 0;
 }
 
-friend_list **list;
+int dao_delete_contact(const char *username, const char* friendname) {
+  sqlite3_stmt *stmt = NULL;
+  int rc = 0, idx = -1;
+  member_info member;
+  member_info friend;
+
+  dao_get_onemb(username, &member);
+  dao_get_onemb(friendname, &friend);
+
+  char *sql = "delete tbl_friend where memberid where memberid=:mid and friendid=:fid";
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    ph_debug("%s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+
+  idx = sqlite3_bind_parameter_index(stmt, ":mid");
+  sqlite3_bind_int(stmt, idx, member.memberid);
+
+  idx = sqlite3_bind_parameter_index(stmt, ":fid");
+  sqlite3_bind_int(stmt, idx, friend.memberid);
+
+  if ((rc != sqlite3_step(stmt)) != SQLITE_ROW) {
+    if (rc != SQLITE_DONE) {
+      ph_debug("%s\n", sqlite3_errmsg(db));
+    }
+    return -1;
+  }
+
+  sqlite3_finalize(stmt);
+  stmt = NULL;
+
+  return 0;
+}
 
 int dao_get_friends(const char* username, friend_list ***list, int *sz) {
   sqlite3_stmt *stmt = NULL;
@@ -218,7 +338,7 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
   char *sql = "select username_a, ipaddr from tbl_friend_list \
     where username=:u";
 
-  friend_list **mylist = malloc(n * sizeof(*list));
+  friend_list **mylist = malloc(n * sizeof(*mylist));
   if (mylist == NULL) {
     ph_debug("%s\n", sqlite3_errmsg(db));
     return -1;
@@ -233,11 +353,15 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
   idx = sqlite3_bind_parameter_index(stmt, ":u");
   sqlite3_bind_text(stmt, idx, username, -1, SQLITE_STATIC);
 
+  friend_list *item = NULL, *pi = NULL;
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    friend_list *item = malloc(sizeof(*item));
+    item = malloc(sizeof(*item));
     if (item == NULL) {
+      free(pi);
       return -1;
     }
+
+    memset(item, 0, sizeof(*item));
 
     buf = (const char*)sqlite3_column_text(stmt, 0);
     buf_len = sqlite3_column_bytes(stmt, 0);
@@ -248,6 +372,7 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
     memcpy(item->ipaddr, buf, buf_len);
 
     mylist[i++] = item;
+    pi = item;
 
     if (i > n) {
       n = (n << 1);
@@ -259,8 +384,13 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
     }
   }
 
-  *sz = i;
-  *list = mylist;
+  if (i > 0) {
+    *sz = i;
+    *list = mylist;
+  } else {
+    free(mylist);
+    *list = NULL;
+  }
 
   sqlite3_finalize(stmt);
   stmt = NULL;
@@ -269,12 +399,13 @@ int dao_get_friends(const char* username, friend_list ***list, int *sz) {
 }
 
 void dao_free_friends_result(friend_list **list, int sz) {
-  assert(list);
-  int i;
-  for (i = 0; i < sz; i++) {
-    if (list[i]) {
-      free(list[i]);
+  if (list) {
+    int i;
+    for (i = 0; i < sz; i++) {
+      if (list[i]) {
+        free(list[i]);
+      }
     }
+    free(list);
   }
-  free(list);
 }
