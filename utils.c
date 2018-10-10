@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
-#include <error.h>
+#include <errno.h>
 #include "utils.h"
 #include "platform.h"
 

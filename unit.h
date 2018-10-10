@@ -20,17 +20,18 @@
     return message;\
   }
 
-#define PH_RUN_TESTS(name) int main(int argc, char *argv[]) {\
+#define PH_RUN_TESTS(name) \
+int main(int argc, char *argv[]) {\
   argc = 1; \
   ph_debug("----- RUNNING: %s", argv[0]); \
-  printf("----\nRUNNING: %s\n", argv[0]); \
+  fprintf(stderr, "----\nRUNNING: %s\n", argv[0]); \
   char *result = name(); \
   if (result != 0) { \
-    printf("FAILED: %s\n", result); \
+    fprintf(stderr, "FAILED: %s\n", result); \
   } else { \
-    printf("ALL TEST PASSED\n"); \
+    fprintf(stderr, "ALL TEST PASSED\n"); \
   } \
-  printf("Tests run: %d\n", tests_run); \
+  fprintf(stderr, "Tests run: %d\n", tests_run); \
   exit(result != 0);\
 }
 

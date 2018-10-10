@@ -2,6 +2,7 @@
 #include <string.h>
 #include <assert.h>
 #include "utils.h"
+#include "debug.h"
 #include "buffer.h"
 
 buffer_t* buf_new(size_t sz) {
@@ -35,6 +36,8 @@ void buf_init(buffer_t *buf, size_t sz) {
 
 int buf_write(buffer_t *buf, void* data, size_t n) {
   if (buf_isfull(buf) == 0) {
+    ph_debug("ringbuf is full, cap:%d rdi:%d wri:%d",
+      buf->capacity -1, buf->rdi, buf->wri);
     return 1;
   }
 
@@ -42,6 +45,8 @@ int buf_write(buffer_t *buf, void* data, size_t n) {
   if (buf->rdi <= buf->wri) {
     sz = buf->capacity - (buf->wri - buf->rdi) - 1;
     if (sz < n) {
+      ph_debug("ringbuf out of size, cap:%d ava:%d rdi:%d wri:%d n:%d",
+        buf->capacity-1, sz, buf->rdi, buf->wri, n);
       return -1;
     }
 
@@ -53,12 +58,14 @@ int buf_write(buffer_t *buf, void* data, size_t n) {
       memcpy(buf->data + buf->wri, data, m);
       buf->wri = (buf->wri + m) % buf->capacity;
 
-      memcpy(buf->data + buf->wri, data, n - m);
+      memcpy(buf->data + buf->wri, (char*)data + m, n - m);
       buf->wri = (buf->wri + n - m) % buf->capacity;
     }
   } else {
     sz = buf->rdi - buf->wri - 1;
     if (sz < n) {
+      ph_debug("ringbuf out of size, cap:%d ava:%d rdi:%d wri:%d n:%d",
+        buf->capacity-1, sz, buf->rdi, buf->wri, n);
       return -1;
     }
 
@@ -71,6 +78,8 @@ int buf_write(buffer_t *buf, void* data, size_t n) {
 
 int buf_read(buffer_t *buf, void* data, size_t n) {
   if (buf_isempty(buf) == 0){
+    ph_debug("ring buf is empty, cap:%d rdi:%d wri:%d",
+      buf->capacity-1, buf->rdi, buf->wri);
     return -1;
   }
 
@@ -78,6 +87,8 @@ int buf_read(buffer_t *buf, void* data, size_t n) {
   if (buf->wri <= buf->rdi) {
     sz = buf->capacity - (buf->rdi - buf->wri) - 1;
     if (sz < n) {
+      ph_debug("ringbuf out of size, cap:%d ava:%d rdi:%d wri:%d n:%d",
+        buf->capacity-1, sz, buf->rdi, buf->wri, n);
       return -1;
     }
     m = buf->capacity - buf->rdi;
@@ -94,6 +105,8 @@ int buf_read(buffer_t *buf, void* data, size_t n) {
   } else {
     sz = buf->wri - buf->rdi;
     if (sz < n) {
+      ph_debug("ringbuf out of size, cap:%d ava:%d, rdi:%d wri:%d n:%d",
+        buf->capacity-1, sz, buf->rdi, buf->wri, n);
       return -1;
     }
     memcpy(data, buf->data + buf->rdi, n);
