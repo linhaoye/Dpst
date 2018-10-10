@@ -50,6 +50,15 @@ tlv_new(uint16_t id, tlv_type_t type,
   return tlv;
 }
 
+void tlv_free(tlv_t *tlv) {
+  if (tlv) {
+    if (tlv->value) {
+      free(tlv->value);
+    }
+    free(tlv);
+  }
+}
+
 int
 tlv_pack(tlv_t *tlv, uint8_t *out, uint32_t out_sz) {
   assert(tlv != NULL);
