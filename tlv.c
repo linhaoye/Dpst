@@ -4,6 +4,7 @@
 #include "platform.h"
 #include "tlv.h"
 #include "utils.h"
+#include "debug.h"
 
 int pack_value (tlv_t *tlv, void *outbuf, uint32_t *out_sz);
 
@@ -66,6 +67,8 @@ tlv_pack(tlv_t *tlv, uint8_t *out, uint32_t out_sz) {
   uint32_t pack_sz = 0;
   pack_sz = tlv_get_packed_size(tlv);
   if (out_sz < pack_sz) {
+    ph_debug("not enough size, out_sz:%d, pack_sz:%d",
+      out_sz, pack_sz);
     return -1;
   }
 
@@ -98,6 +101,8 @@ tlv_unpack(tlv_t *tlv, uint8_t *packed,  uint32_t sz) {
   ADVANCE16P(p);
 
   if (length > sz) {
+    ph_debug("not enough packed buf, length:%d sz:%d",
+      length, sz);
     return -1;
   }
 
@@ -201,6 +206,7 @@ unpack_value(tlv_type_t type, uint16_t id, void *inbuf, uint16_t length, tlv_t *
 
   out_tlv->id = id;
   out_tlv->type = type;
+  out_tlv->length = length;
   out_tlv->value = value;
 
   return b;

@@ -27,7 +27,10 @@ char *tlv_pack_struct_test() {
   if (tlv_unpack(&ntlv, pack_buf, 1024)< 0) {
     return "pack error!";
   }
-  memcpy(&unpack_data, tlv->value, tlv->length);
+  ph_debug("tlv.length=%d", tlv->length);
+  ph_debug("ntlv.length=%d", ntlv.length);
+  memcpy((char*)&unpack_data, ntlv.value, ntlv.length);
+
 
   ph_debug("%s", unpack_data.buf);
   ph_debug("%d", unpack_data.id);
