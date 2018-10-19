@@ -1,7 +1,7 @@
 #ifndef __ATM_H__
 #define __ATM_H__
 
-#if defined __GNUC__ || defined __CYGWIN___ || defined __MINGW32__ || defined __APPLE__
+#if defined __GNUC__
 
 #include <sched.h> //for sched_yield
 
@@ -17,7 +17,7 @@
 #define MEMORY_BARRIER __sync_synchronize()
 #define YIELD_THREAD sched_yield()
 
-#else
+#elif defined _WIN32
 
 #include <windows.h>
 
@@ -33,4 +33,6 @@
 #define MEMORY_BARRIER MemoryBarrier()
 #define YIELD_THREAD SwitchToThread()
 
+#else
+#error "not support platform"
 #endif
