@@ -22,9 +22,9 @@
 #include <windows.h>
 
 #define AT_FAA(v, a) InterlockedExchangeAddNoFence((volatile LONG *)&(v), (LONG)(a))
-#define AT_FAS(v, a)
+#define AT_FAS(v, a) AT_FAA(v, -a)
 #define AT_AAF(v, a) InterlockedAddNoFence((volatile LONG *)&(v), (LONG)(a))
-#define AT_SAF(v, a)
+#define AT_SAF(v, a) AT_AAF(v, -a)
 #define AT_TAS(v, a) InterlockedBitTestAndSet((volatile LONG*)&(v), (LONG)a)
 #define AT_INC(v) InterlockedIncrementNoFence((volatile LONG*)&(v))
 #define AT_DEC(v) InterlockedDecrementNoFence((volatile LONG*)&(v))
