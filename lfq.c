@@ -10,6 +10,11 @@
 #define _sleep(milisec) Sleep(milisec)
 #endif
 
+struct lfq_cas_node_s {
+  void *value;
+  struct lfq_cas_node_s *next;
+};
+
 static inline void* _lfq_malloc(size_t sz) {
   return malloc(sz);
 }
@@ -58,13 +63,13 @@ int lfq_enq(lfq_t *lfq, void *value) {
     tail = lfq->tail;
     if (AT_CAS(tail->next, NULL, node)) {
       if (AT_CAS(lfq->tail, tail, node)) {
-        goto next;
+        goto done;
       }
     }
   }
   //never be here
   return -1;
-next:
+done:
   AT_AAF(&lfq->size, 1);
   return 0;
 }
