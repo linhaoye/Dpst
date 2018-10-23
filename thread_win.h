@@ -24,6 +24,7 @@ typedef struct {
   thread_t *threads;
   int status;
   int counter;
+  void (*task)(void* data);
   size_t pool_sz;
 } thread_pool;
 

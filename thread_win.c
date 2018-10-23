@@ -13,13 +13,18 @@ static unsigned int __stdcall thread_pool_process(PVOID param) {
 
   void *data = NULL;
   while (thread->parent->status) {
+    out:
     if ((data = lfq_deq((lfq_t*)thread->queue)) == NULL) {
       if (AT_CAS(thread->stat, BUSY, IDLE)) {
         SuspendThread(thread);
+        goto out;
       }
     }
 
-    ph_debug("run task!!!"); 
+    if (thread->parent->task != NULL) {
+      thread->parent->task(data);
+      ph_debug("run task!!!"); 
+    }
   }
 
   return 0;
@@ -38,7 +43,7 @@ thread_pool* thread_pool_new(size_t size) {
 
   pool =  malloc(sizeof(*pool));
   if (pool == NULL) {
-    ph_log_err("fatal error: malloc(%d)!", sizeof(*pool));
+    ph_log_err("fatal error: malloc pool fail!");
     return NULL;
   }
   memset(pool, 0, sizeof(*pool));
