@@ -19,20 +19,29 @@
 
 #elif defined _WIN32
 
+#if defined(_WIN32) && !defined(__cplusplus)
+#define inline __inline
+#endif
+
 #include <windows.h>
 
-#define AT_FAA(v, a) InterlockedExchangeAddNoFence((volatile LONG *)&(v), (LONG)(a))
+inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
+  return InterlockedExchangeAdd(Addend, Value) + Value;
+}
+
+#define AT_FAA(v, a) InterlockedExchangeAdd((volatile LONG *)&(v), (LONG)(a))
 #define AT_FAS(v, a) AT_FAA(v, -a)
-#define AT_AAF(v, a) InterlockedAddNoFence((volatile LONG *)&(v), (LONG)(a))
+#define AT_AAF(v, a) __InterlockedAdd((volatile LONG *)&(v), (LONG)(a))
 #define AT_SAF(v, a) AT_AAF(v, -a)
 #define AT_TAS(v, a) InterlockedBitTestAndSet((volatile LONG*)&(v), (LONG)a)
-#define AT_INC(v) InterlockedIncrementNoFence((volatile LONG*)&(v))
-#define AT_DEC(v) InterlockedDecrementNoFence((volatile LONG*)&(v))
-#define AT_CAS(v, o, n) (InterlockedCompareExchangeNoFence((volatile LONG *)&(v), (LONG)(n), (LONG)(o)) == o)
+#define AT_INC(v) InterlockedIncrement((volatile LONG*)&(v))
+#define AT_DEC(v) InterlockedDecrement((volatile LONG*)&(v))
+#define AT_CAS(v, o, n) (InterlockedCompareExchange((volatile LONG *)&(v), (LONG)(n), (LONG)(o)) == o)
 #define AT_LOAD(v) AT_FAA(v, 0)
 #define MEMORY_BARRIER MemoryBarrier()
 #define YIELD_THREAD SwitchToThread()
 
 #else
 #error "not support platform"
+#endif
 #endif
