@@ -6,6 +6,7 @@
 
 char *atomic_test() {
   int a = 5;
+  ph_debug("a=5");
   AT_FAA(a, 1);
   ph_debug("AT_FAA: a=%d", a);
   AT_FAS(a, 1);
@@ -27,6 +28,7 @@ char *run_atomic_tests() {
   ph_suite_start();
 
   ph_run_test(atomic_test);
+  return NULL;
 }
 
 PH_RUN_TESTS(run_atomic_tests);
