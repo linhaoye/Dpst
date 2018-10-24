@@ -1,7 +1,7 @@
 #ifndef __ATM_H__
 #define __ATM_H__
 
-#if defined __GNUC__
+#if defined __GNUC1__
 
 #include <sched.h> //for sched_yield
 
@@ -35,4 +35,5 @@
 
 #else
 #error "not support platform"
+#endif
 #endif
