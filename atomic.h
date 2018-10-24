@@ -38,7 +38,8 @@ inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
 #define AT_DEC(v) InterlockedDecrement((volatile LONG*)&(v))
 #define AT_CAS(v, o, n) (InterlockedCompareExchange((volatile LONG *)&(v), (LONG)(n), (LONG)(o)) == o)
 #define AT_LOAD(v) AT_FAA(v, 0)
-#define MEMORY_BARRIER MemoryBarrier()
+#define MEMORY_BARRIER __asm("mfence;")
+// #define MEMORY_BARRIER MemoryBarrier()
 #define YIELD_THREAD SwitchToThread()
 
 #else

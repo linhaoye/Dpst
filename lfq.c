@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "lfq.h"
 #include "atomic.h"
 #include "debug.h"
 
@@ -33,7 +34,7 @@ int lfq_init_mf(lfq_t *lfq, lfq_malloc_fn _malloc, lfq_free_fn _free) {
 
   lfq_cas_node_t *node = _malloc(sizeof(*node));
   if (node == NULL) {
-    ph_debug("fata error: malloc(%d)", sizeof(*node));
+    ph_debug("fatal error: malloc lfq_cas_node_t!");
     return -1;
   }
 
@@ -50,8 +51,8 @@ int lfq_enq(lfq_t *lfq, void *value) {
   lfq_cas_node_t *tail, *node;
 
   node = (lfq_cas_node_t*)lfq->_malloc(sizeof(*node));
-  if (node != NULL) {
-    ph_debug("fata error: malloc(%d)", sizeof(*node));
+  if (node == NULL) {
+    ph_debug("fatal error: malloc lfq_cas_node_t!");
     return -1;
   }
 
@@ -70,7 +71,7 @@ int lfq_enq(lfq_t *lfq, void *value) {
   //never be here
   return -1;
 done:
-  AT_AAF(&lfq->size, 1);
+  AT_AAF(lfq->size, 1);
   return 0;
 }
 
