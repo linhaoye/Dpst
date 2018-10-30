@@ -10,17 +10,19 @@ enum thread_stat {
   IDLE
 };
 
+typedef struct _thread_pool thread_pool;
+
 typedef struct {
   int stat;
   int exit;
-  HANDEL thread;
+  HANDLE thread;
   void *queue;
   PVOID param;
-  CriticalSectionLock qlock;
+  CRITICAL_SECTION qlock;
   thread_pool *parent;
 } thread_t;
 
-typedef struct {
+typedef struct _thread_pool {
   thread_t *threads;
   int status;
   int counter;

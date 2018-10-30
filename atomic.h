@@ -25,7 +25,7 @@
 
 #include <windows.h>
 
-inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
+static inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
   return InterlockedExchangeAdd(Addend, Value) + Value;
 }
 

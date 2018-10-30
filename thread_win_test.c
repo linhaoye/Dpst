@@ -1,0 +1,67 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <time.h>
+#include "thread_win.h"
+#include "debug.h"
+#include "unit.h"
+
+#define NUM_THREAD 1
+#define TOTAL 10
+
+void task_fn(void *data) {
+}
+
+char *thread_pool_test() {
+  int i, *in_data = NULL;
+  thread_pool *pool = NULL;
+  thread_pool_envinit();
+
+  pool = thread_pool_new(NUM_THREAD);
+  if (pool == NULL) {
+    ph_debug("something wrong!!!");
+    exit(-1);
+  }
+  pool->task = task_fn;
+
+  thread_pool_start(pool);
+
+  for (i = 0; i < TOTAL; i++) {
+    in_data = (int*) malloc(sizeof(int));
+    assert(in_data != NULL);
+    *in_data = i;
+    ph_debug("main %d", i);
+    thread_pool_dispatch(pool, in_data);
+  }
+   Sleep(5000);
+  // thread_pool_end(pool);
+  DWORD dw;
+  for (i = 0; i<pool->pool_sz; i++) {
+    dw = WaitForSingleObject(pool->threads[i].thread, INFINITE);
+    switch (dw) {
+    case WAIT_OBJECT_0:
+      CloseHandle(pool->threads[i].thread);
+      break;
+    case WAIT_FAILED:
+      ph_debug("wait fail!!!");
+      break;
+    default:
+      break;
+    }
+
+    lfq_deinit(pool->threads[i].queue);
+    free(pool->threads[i].queue);
+
+  }
+
+  return NULL;
+}
+
+char *run_all_test() {
+  ph_suite_start();
+
+  ph_run_test(thread_pool_test);
+  return NULL;
+}
+
+PH_RUN_TESTS(run_all_test);
