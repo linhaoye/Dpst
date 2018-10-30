@@ -101,8 +101,10 @@ void* lfq_deq(lfq_t *lfq) {
       }
     }
   }
+  
   MEMORY_BARRIER;
   AT_FAS(lfq->size, 1);
+
 done:
   return val;
 }

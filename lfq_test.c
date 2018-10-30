@@ -70,9 +70,41 @@ char *lfq_test() {
   return NULL;
 }
 
+char *lfq_single_test() {
+  lfq_init(&myq);
+
+  void *data;
+  lfq_deq(&myq);
+  lfq_deq(&myq);
+  lfq_deq(&myq);
+  lfq_deq(&myq);
+  lfq_deq(&myq);
+  ph_debug("%d", myq.size);
+
+  int i, *int_data;
+  for (i=0; i<  100; i++) {
+    int_data = (int *)malloc(sizeof(int));
+    assert(int_data != NULL);
+    *int_data = i;
+    lfq_enq(&myq, int_data);
+  }
+  ph_debug("%d", myq.size);
+
+  for (i = 0; i < 10000; i++) {
+    data = lfq_deq(&myq);
+    if (data != NULL) {
+      ph_debug("out: %d", *((int*) (data)));
+    }
+  }
+  ph_debug("%d", myq.size);
+
+  return NULL;
+}
+
 char* run_lfq_tests() {
   ph_suite_start();
 
+  // ph_run_test(lfq_single_test);
   ph_run_test(lfq_test);
   return NULL;
 }

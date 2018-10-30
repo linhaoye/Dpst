@@ -25,7 +25,9 @@
 
 #include <windows.h>
 
-inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
+#define __builtin_expect(exp, c) (exp)
+
+static inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
   return InterlockedExchangeAdd(Addend, Value) + Value;
 }
 
@@ -45,4 +47,12 @@ inline LONG __InterlockedAdd(volatile LONG *Addend, LONG Value) {
 #else
 #error "not support platform"
 #endif
+
+#define AT_SET(v, n) {\
+  int b = 0;\
+  do {\
+    b = AT_CAS(v, AT_LOAD(v), n);\
+  } while (__builtin_expect(!b, 0));\
+}
+
 #endif
