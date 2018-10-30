@@ -47,7 +47,8 @@ char *lfq_test() {
 
     for (i=0; i < THREAD_NUM; i++) {
       unsigned upd_thread_id;
-      h[i] = (HANDLE)_beginthreadex(NULL, 0, thread_proc, NULL, 0, &upd_thread_id);
+      h[i] = (HANDLE)_beginthreadex(NULL, 0, thread_proc, 
+        NULL, 0, &upd_thread_id);
     }
     for (i=0; i < THREAD_NUM; i++) {
       DWORD dw;
