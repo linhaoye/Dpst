@@ -6,10 +6,11 @@
 #include "debug.h"
 #include "unit.h"
 
-#define NUM_THREAD 8
+#define NUM_THREAD 12
 #define TOTAL 10000
 
 void task_fn(void *data) {
+  ph_debug("%d", *(int*)data);
 }
 
 char *thread_pool_test() {
@@ -26,6 +27,7 @@ char *thread_pool_test() {
 
   thread_pool_start(pool);
 
+  Sleep(1000);
   for (i = 0; i < TOTAL; i++) {
     in_data = (int*) malloc(sizeof(int));
     assert(in_data != NULL);
@@ -35,24 +37,7 @@ char *thread_pool_test() {
   }
    Sleep(5000);
   // thread_pool_end(pool);
-  DWORD dw;
-  for (i = 0; i<pool->pool_sz; i++) {
-    dw = WaitForSingleObject(pool->threads[i].thread, INFINITE);
-    switch (dw) {
-    case WAIT_OBJECT_0:
-      CloseHandle(pool->threads[i].thread);
-      break;
-    case WAIT_FAILED:
-      ph_debug("wait fail!!!");
-      break;
-    default:
-      break;
-    }
-
-    lfq_deinit(pool->threads[i].queue);
-    free(pool->threads[i].queue);
-
-  }
+   thread_pool_end(pool);
 
   return NULL;
 }

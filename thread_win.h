@@ -15,7 +15,8 @@ typedef struct _thread_pool thread_pool;
 typedef struct {
   int stat;
   int exit;
-  HANDLE thread;
+  HANDLE thd;
+  HANDLE event;
   void *queue;
   PVOID param;
   CRITICAL_SECTION qlock;

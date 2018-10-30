@@ -109,6 +109,10 @@ done:
   return val;
 }
 
+size_t lfq_size(lfq_t *lfq) {
+  return AT_AAF(lfq->size, 0);
+}
+
 void lfq_deinit(lfq_t *lfq) {
   void *p;
   while ((p = lfq_deq(lfq))) {

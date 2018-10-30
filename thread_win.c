@@ -9,26 +9,29 @@
 #define MAX_THR_NUM 32
 
 static unsigned int __stdcall thread_pool_process(PVOID param) {
-  thread_t *thread = (thread_t*) param;
-  lfq_t *myq = (lfq_t *)thread->queue;
+  thread_t *thread = (thread_t*)param;
+  lfq_t *myq = (lfq_t*)thread->queue;
 
- void *data = NULL;
+  void *data = NULL;
+  DWORD dw;
   while (thread->parent->status) {
     out:
     if ((data = lfq_deq(myq)) == NULL) {
-        if (AT_CAS(thread->stat, BUSY, IDLE)){
+        AT_CAS(thread->stat, BUSY, IDLE);
+        ResetEvent(thread->event);
+
+        dw = WaitForSingleObject(thread->event, INFINITE);
+        switch (dw) {
+        case WAIT_FAILED:
+          ph_debug("Invalid ?");
+          break;
         }
-        SuspendThread(GetCurrentThread());
-        ph_debug("bbbbbbb");
+        AT_CAS(thread->stat, IDLE, BUSY);
         goto out;
     }
 
-    ph_debug("get!, %x, %d", data, thread->stat);
-
     if (thread->parent->task != NULL) {
       thread->parent->task(data);
-      ph_debug("thread[%d] run task, data=%d, lfq_size=%d!!!", 
-        (LONG)thread->thread, *((int*)data), myq->size); 
     }
   }
 
@@ -48,7 +51,7 @@ thread_pool* thread_pool_new(size_t size) {
 
   pool =  malloc(sizeof(*pool));
   if (pool == NULL) {
-    ph_debug("malloc pool fail!");
+    ph_debug("malloc pool error!");
     return NULL;
   }
   memset(pool, 0, sizeof(*pool));
@@ -56,20 +59,21 @@ thread_pool* thread_pool_new(size_t size) {
   thread_t *threads;
   threads = malloc(size * sizeof(*threads));
   if (threads == NULL) {
-    ph_debug("malloc threads fail!");
+    ph_debug("malloc threads error!");
     return NULL;
   }
 
   for (i = 0; i < size; i++) {
     lfq_t *lfq = malloc(sizeof(*lfq));
     if (lfq == NULL) {
-      ph_debug("malloc lfq fail!");
+      ph_debug("malloc lfq error!");
       return NULL;
     }
     lfq_init(lfq);
 
     threads[i].queue = lfq;
     threads[i].stat = IDLE;
+    threads[i].event = CreateEvent(NULL, TRUE, FALSE, NULL);
   }
 
   pool->pool_sz = size;
@@ -85,9 +89,8 @@ void thread_pool_start(thread_pool *pool) {
   int i;
   for (i = 0; i < pool->pool_sz; i++) {
     pool->threads[i].parent = pool;
-    pool->threads[i].thread = (HANDLE)_beginthreadex(0, 0, thread_pool_process, 
-                                &(pool->threads[i]), 0, 0);
-    ph_debug("start POOL?");
+    pool->threads[i].thd = (HANDLE)_beginthreadex(0, 0, thread_pool_process, 
+                            &(pool->threads[i]), 0, 0);
   }
 }
 
@@ -98,7 +101,6 @@ void thread_pool_dispatch(thread_pool *pool, void *data) {
   for (i = 0; i < pool->pool_sz; i++) {
     n = i;
     if (AT_CAS(pool->threads[i].stat, IDLE, IDLE)) {
-      ph_debug("take the %d, %d", n, pool->threads[i].stat);
       goto done;
     }
   }
@@ -110,14 +112,13 @@ void thread_pool_dispatch(thread_pool *pool, void *data) {
     n = 0;
   }
   pool->counter++;
-  ph_debug("Get the %d", n);
 
 done:
   thread = &(pool->threads[n]);
 
   if (lfq_enq((lfq_t*)(thread->queue), data) > -1) {
-    if (AT_CAS(thread->stat, IDLE, BUSY)) {
-      ResumeThread(thread->thread);
+    if (AT_CAS(thread->stat, IDLE, IDLE)) {
+      SetEvent(thread->event);
     }
   }
 }
@@ -128,10 +129,10 @@ void thread_pool_end(thread_pool *pool) {
   DWORD dw;
 
   for (i = 0; i<pool->pool_sz; i++) {
-    dw = WaitForSingleObject(pool->threads[i].thread, INFINITE);
+    dw = WaitForSingleObject(pool->threads[i].thd, INFINITE);
     switch (dw) {
     case WAIT_OBJECT_0:
-      CloseHandle(pool->threads[i].thread);
+      CloseHandle(pool->threads[i].thd);
       break;
     case WAIT_FAILED:
       ph_debug("wait fail!!!");
@@ -142,7 +143,6 @@ void thread_pool_end(thread_pool *pool) {
 
     lfq_deinit(pool->threads[i].queue);
     free(pool->threads[i].queue);
-
   }
 
   free(pool->threads);
