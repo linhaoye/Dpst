@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include "lfq.h"
 #include "atomic.h"
 #include "debug.h"
@@ -29,6 +31,9 @@ int lfq_init(lfq_t *lfq) {
 }
 
 int lfq_init_mf(lfq_t *lfq, lfq_malloc_fn _malloc, lfq_free_fn _free) {
+  assert(lfq != NULL);
+  memset(lfq, 0, sizeof(*lfq));
+
   lfq->_malloc = _malloc;
   lfq->_free = _free;
 

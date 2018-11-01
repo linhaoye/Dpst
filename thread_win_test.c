@@ -6,11 +6,11 @@
 #include "debug.h"
 #include "unit.h"
 
-#define NUM_THREAD 12
-#define TOTAL 10000
+#define NUM_THREAD 1
+#define TOTAL 10
 
 void task_fn(void *data) {
-  ph_debug("%d", *(int*)data);
+  printf("%d\n", *(int*)data);
 }
 
 char *thread_pool_test() {

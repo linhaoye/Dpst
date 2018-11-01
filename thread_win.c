@@ -29,6 +29,7 @@ static unsigned int __stdcall thread_pool_process(PVOID param) {
         AT_CAS(thread->stat, IDLE, BUSY);
         goto out;
     }
+    printf("%d", *(int*)data);
 
     if (thread->parent->task != NULL) {
       thread->parent->task(data);
