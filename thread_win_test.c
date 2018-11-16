@@ -10,7 +10,7 @@
 #define TOTAL 10
 
 void task_fn(void *data) {
-  printf("%d\n", *(int*)data);
+  ph_debug("%d\n", *(int*)data);
 }
 
 char *thread_pool_test() {
@@ -26,8 +26,9 @@ char *thread_pool_test() {
   pool->task = task_fn;
 
   thread_pool_start(pool);
-
-  Sleep(1000);
+  ph_debug("pool start");
+  // Sleep(1000);
+  ph_debug("pool dispatch");
   for (i = 0; i < TOTAL; i++) {
     in_data = (int*) malloc(sizeof(int));
     assert(in_data != NULL);
@@ -35,9 +36,9 @@ char *thread_pool_test() {
     ph_debug("main %d", i);
     thread_pool_dispatch(pool, in_data);
   }
-   Sleep(5000);
-  // thread_pool_end(pool);
-   thread_pool_end(pool);
+   // Sleep(5000);
+  ph_debug("over");
+  thread_pool_end(pool);
 
   return NULL;
 }

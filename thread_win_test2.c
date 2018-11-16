@@ -7,6 +7,7 @@
 
 lfq_t myq;
 HANDLE hEvent;
+HANDLE hqEvent;
 
 static unsigned int __stdcall winthread_proc(PVOID param) {
 	printf("%s\n", "running!!!!");
@@ -34,6 +35,7 @@ int main(void) {
 
 	lfq_init(&myq);
 	hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	hqEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	h = (HANDLE)_beginthreadex(0, 0, winthread_proc, NULL, /*CREATE_SUSPENDED*/0, 0);
 
@@ -49,7 +51,7 @@ int main(void) {
 	SetEvent(hEvent);
 
 	DWORD dw;
-	dw = WaitForSingleObject(h, INFINITE);
+	dw = WaitForSingleObject(hqEvent, INFINITE);
 	switch (dw) {
 	case WAIT_FAILED:
 		fprintf(stderr, "%s\n", "invalid handle??");

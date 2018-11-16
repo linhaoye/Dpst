@@ -7,6 +7,7 @@
 #include "lfq.h"
 
 #define MAX_THR_NUM 32
+#define MAX_IDLE_LIFE 1 * 60 * 1000
 
 static unsigned int __stdcall thread_pool_process(PVOID param) {
   thread_t *thread = (thread_t*)param;
@@ -20,7 +21,7 @@ static unsigned int __stdcall thread_pool_process(PVOID param) {
         AT_CAS(thread->stat, BUSY, IDLE);
         ResetEvent(thread->event);
 
-        dw = WaitForSingleObject(thread->event, INFINITE);
+        dw = WaitForSingleObject(thread->event, MAX_IDLE_LIFE);
         switch (dw) {
         case WAIT_FAILED:
           ph_debug("Invalid ?");
@@ -127,20 +128,26 @@ void thread_pool_end(thread_pool *pool) {
   assert(pool != NULL);
   int i = 0;
   DWORD dw;
-
-  for (i = 0; i<pool->pool_sz; i++) {
-    dw = WaitForSingleObject(pool->threads[i].thd, INFINITE);
+  while(1) {
+    dw = WaitForSingleObject(pool->threads[i].thd, 1000);
     switch (dw) {
     case WAIT_OBJECT_0:
       CloseHandle(pool->threads[i].thd);
+      i++;
+      if (i >= pool->pool_sz) {
+        goto clean;
+      }
       break;
     case WAIT_FAILED:
-      ph_debug("wait fail!!!");
       break;
-    default:
+    case WAIT_TIMEOUT:
+      ph_debug("Time out?");
       break;
     }
+  }
 
+  clean:
+  for (i = 0; i<pool->pool_sz; i++) {
     lfq_deinit(pool->threads[i].queue);
     free(pool->threads[i].queue);
   }
