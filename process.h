@@ -46,6 +46,7 @@ typedef struct {
   int server_status;
   void* (*set)(void *data, int sz);
   void (*unset)(void *data, int sz);
+  void (*task)(void *data);
 } process_pool;
 
 void process_pool_envinit();

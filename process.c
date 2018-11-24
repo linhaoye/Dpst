@@ -117,6 +117,9 @@ static void worker_process(process_pool *pool, int p) {
   while (1) {
     n = read(p, &jobs, sizeof(job_t));
     if (n > 0) {
+      if (p->task != NULL) {
+        p->task(&jobs);
+      }
       elog(0, "worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
     }
   }

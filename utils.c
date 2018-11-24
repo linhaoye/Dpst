@@ -159,3 +159,68 @@ void s_free(void *p, size_t sz) {
   }
 #endif
 }
+
+static size_t read_cb(char *ptr, size_t size, size_t nmemb, void *stream) {
+  struct cUrl_response_t *buf = (struct cUrl_response_t*)stream;
+  int block = size * nmemb;
+
+  if (!buf) {
+    return block;
+  }
+
+  if (buf->content == NULL) {
+    buf->content = (char *)malloc(block);
+  } else {
+    buf->content = (char *)realloc(buf->content, buf->length + block);
+  }
+
+  if (buf->content == NULL) {
+    return block;
+  }
+
+  memcpy(buf->data + buf->length, ptr, block);
+  buf->length += block;
+
+  return block;
+}
+
+void http_get(const char *url, struct cUrl_response_t *content) {
+  CURL *curl = NULL;
+  CURLcode rcode;
+  struct curl_slist *headers = NULL;
+
+  rcode = curl_global_init(CURL_GLOBAL_ALL)
+  if (rcode != CURLE_OK) {
+    elog(0, "curl blobal init error: %s", curl_easy_strerror(rcode));
+    return;
+  }
+
+  if (curl == NULL) {
+    curl_global_cleanup();
+    return;
+  }
+
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, read_cb);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
+
+  curl_easy_perform(curl);
+
+  int len = 0;
+  rcode = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, len);
+  if (rcode == CURLE_OK) {
+    *data_len = len;
+  }
+
+  curl_easy_cleanup(curl);
+  curl_global_cleanup();
+}
+
+void http_post(const char *url, char *post_field, struct cUrl_response_t *content) {
+  CURL *curl = NULL;
+  CURLcode rcode;
+  struct curl_slist *headers = NULL;
+
+  rcode = curl_global_init(CURL_GLOBAL_ALL);
+}
