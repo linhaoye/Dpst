@@ -151,6 +151,23 @@ void *s_malloc(size_t sz) {
 #endif
 }
 
+void s_realloc(void *p, size_t old_sz, size_t new_sz) {
+#ifdef _WIN32
+  return NULL;
+#else
+  void *newp;
+  newp = s_malloc(sz);
+  if (newp == NULL) {
+    return NULL;
+  }
+
+  memcpy(newp, p, new_sz);
+  s_free(p, old_sz);
+
+  return newp;
+#endif
+}
+
 void s_free(void *p, size_t sz) {
 #ifdef _WIN32
   return;

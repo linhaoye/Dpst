@@ -12,6 +12,7 @@ static void vec_expand(char **data, int *length, int *capacity, int memsz) {
     } else {
       *capacity <<= 1;
     }
+
     *data = realloc(*data, *capacity * memsz);
   }
 }
@@ -36,6 +37,10 @@ static void vec_splice(
 
 #define vec_init(v)\
   memset((v), 0, sizeof(*(v)))
+
+#define vec_new(v, c)\
+  (vec_init(v),\
+   vec_expand((char**)&(v)->data, c, c>>1, sizeof(*(v)->data)))
 
 
 #define vec_deinit(v)\
