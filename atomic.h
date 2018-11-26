@@ -1,7 +1,7 @@
 #ifndef __ATM_H__
 #define __ATM_H__
 
-#if defined __GNUC1__
+#if defined __GNUC__
 
 #include <sched.h> //for sched_yield
 

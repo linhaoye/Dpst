@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include <time.h>
-#include <errno.h>
+#include <curl/curl.h>
 #include "utils.h"
 #include "platform.h"
 
@@ -178,7 +179,7 @@ static size_t read_cb(char *ptr, size_t size, size_t nmemb, void *stream) {
     return block;
   }
 
-  memcpy(buf->data + buf->length, ptr, block);
+  memcpy(buf->content + buf->length, ptr, block);
   buf->length += block;
 
   return block;
@@ -189,11 +190,14 @@ void http_get(const char *url, struct cUrl_response_t *content) {
   CURLcode rcode;
   struct curl_slist *headers = NULL;
 
-  rcode = curl_global_init(CURL_GLOBAL_ALL)
+  rcode = curl_global_init(CURL_GLOBAL_ALL);
+
   if (rcode != CURLE_OK) {
     elog(0, "curl blobal init error: %s", curl_easy_strerror(rcode));
     return;
   }
+
+  curl = curl_easy_init();
 
   if (curl == NULL) {
     curl_global_cleanup();
@@ -205,22 +209,49 @@ void http_get(const char *url, struct cUrl_response_t *content) {
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, read_cb);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
 
-  curl_easy_perform(curl);
+  rcode = curl_easy_perform(curl);
 
-  int len = 0;
-  rcode = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, len);
-  if (rcode == CURLE_OK) {
-    *data_len = len;
+  if (rcode != CURLE_OK) {
+    elog(0, "curl request failed. %s", curl_easy_strerror(rcode));
   }
 
   curl_easy_cleanup(curl);
   curl_global_cleanup();
 }
 
-void http_post(const char *url, char *post_field, struct cUrl_response_t *content) {
+void http_post(const char *url, char *post_field, 
+                int len, struct cUrl_response_t *content) {
   CURL *curl = NULL;
   CURLcode rcode;
   struct curl_slist *headers = NULL;
 
   rcode = curl_global_init(CURL_GLOBAL_ALL);
+
+  if (rcode != CURLE_OK) {
+    elog(0, "curl global init error: %s", curl_easy_strerror(rcode));
+    return;
+  }
+
+  curl = curl_easy_init();
+
+  if (curl == NULL) {
+    curl_global_cleanup();
+    return;
+  }
+
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_field);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, len);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, read_cb);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
+
+  rcode = curl_easy_perform(curl);
+
+  if (rcode != CURLE_OK) {
+    elog(0, "curl request failed. %s", curl_easy_strerror(rcode));
+  }
+
+  curl_easy_cleanup(curl);
+  curl_global_cleanup();
 }

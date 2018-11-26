@@ -12,8 +12,15 @@ typedef int socklen_t;
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
+
+#define ERRNO errno
+
 #endif
+
+#include <fcntl.h>
 
 #endif
