@@ -96,7 +96,7 @@ int listen_s1(uint16_t port) {
   sa.len = sizeof(sa.u.sin);
 #endif
 
-  if (bind(sock, &sa.u.sa, sa.len) < 0) {
+  if (bind(sock, &sa.u.sa, &sa.len) < 0) {
     elog(1, "listening: af %d bind(%d):%s", af, port,strerror(ERRNO));
   }
 
