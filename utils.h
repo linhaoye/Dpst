@@ -19,6 +19,7 @@ int listen_s0(int port, uint32_t addr, int backlog);
 int listen_s1(uint16_t port);
 int blockmode(int fd, int block);
 void *s_malloc(size_t sz);
+void *s_calloc(size_t num, size_t sz);
 void *s_realloc(void *p, size_t old_sz, size_t new_sz);
 void s_free(void *p, size_t sz);
 void http_get(const char *url, struct cUrl_response_t *content);

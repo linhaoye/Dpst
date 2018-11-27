@@ -77,6 +77,9 @@ int listen_s1(uint16_t port) {
 #else
   af = PF_INET;
 #endif
+  if ((sock = socket(af, SOCK_STREAM, 6)) == -1) {
+    elog(1, "Listen: socket: %s", strerror(ERRNO));
+  }
 
   blockmode(sock, 0);
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on));
@@ -148,6 +151,23 @@ void *s_malloc(size_t sz) {
     elog(1, "mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
   }
   return mem;
+#endif
+}
+
+void *s_calloc(size_t num, size_t sz) {
+#ifdef _WIN32
+  return NULL;
+#else
+  void *p;
+  int p_sz = num * sz;
+
+  p = s_malloc(p_sz);
+  if (p == NULL) {
+    return NULL;
+  }
+
+  memset(p, 0, p_sz);
+  return p;
 #endif
 }
 
