@@ -25,7 +25,7 @@ static struct {
 /* memory allocation */
 static void* ptr; 
 static int ptr_offset;
-static mut_t ptr_lock;
+static mutex_t ptr_lock;
 
 /* process tag */
 enum {
@@ -39,7 +39,7 @@ typedef struct {
 } Pipe;
 
 static void* set(void *data, int sz) {
-  MUT_LOCK(&ptr_lock);
+  mutex_lock(ptr_lock);
 
   void *p = ptr + ptr_offset;
   int n = ptr_offset + sz;
@@ -55,30 +55,30 @@ static void* set(void *data, int sz) {
     memcpy (p, data, sz);
   }
 
-  MUT_UNLOCK(&ptr_lock);
+  mutex_unlock(ptr_lock);
 
   return p;
 }
 
 static void *get(int sz) {
-  MUT_LOCK(&ptr_lock);
+  mutex_lock(ptr_lock);
 
   void *p = ptr + ptr_offset;
   ptr_offset += sz;
 
-  MUT_UNLOCK(&ptr_lock);
+  mutex_unlock(ptr_lock);
 
   return p;
 }
 
 static void unset(void *data, int sz) {
-  MUT_LOCK(&ptr_lock);
+  mutex_lock(ptr_lock);
 
   if (data > ptr) {
     memcpy(data, data + sz, (ptr_offset - (data - ptr) - sz))
   }
 
-  MUT_UNLOCK(&ptr_lock);
+  mutex_unlock(ptr_lock);
 }
 
 static int spawn(process_pool *pool, int n) {
@@ -214,7 +214,7 @@ void process_pool_envinit() {
   ptr = s_malloc(_PN * 1024);
   ptr_offset = 0;
   ctx.process_type = MASTER_PROCESS;
-  MUT_INIT(&ptr_lock, 1);
+  mutex_init(ptr_lock, 1);
 }
 
 void process_pool_start(process_pool *pool) {

@@ -41,7 +41,7 @@ typedef struct stream stream;
 
 static int stream_count;
 static stream *ds_stream, *stream_list;
-static mut_t stream_lock;
+static mutex_t stream_lock;
 
 void stream_init(void) {
   /*We're unlikely to see an FD much higher than maxstreams.*/
@@ -49,6 +49,10 @@ void stream_init(void) {
   if (!stream_list) {
     ph_debug("stream new error!");
     exit(-1);
+  }
+  int i;
+  for (i = 0; i < max_fds; i++) {
+    stream_list[i].sfd = INVALID_SOCKET;
   }
 }
 
@@ -85,6 +89,7 @@ void stream_cleanup(stream *s) {
     buf_free(s->iobuf);
   }
   memset(s, 0, sizeof(*s));
+  s->sfd = INVALID_SOCKET;
 }
 
 void stream_destroy(stream *s) {
@@ -110,14 +115,11 @@ int get_stream_count(void) {
 
 void destory_closed_stream(void) {
   stream *s = ds_stream;
+
   while (s) {
     if (s->state == STATE_CLOSED) {
       stream *next = s->next;
-
-      MUT_LOCK(&stream_lock);
       stream_destroy(s);
-      MUT_UNLOCK(&stream_lock);
-
       s = next;
     } else {
       s = s->next;
@@ -143,22 +145,22 @@ void stream_accept_connection(stream *s) {
     }
 
     /* Create client stream */
-    MUT_LOCK(&stream_lock);
-
     remote = stream_new(sockfd, 1, &sin, 8192);
     remote->state = STATE_CONNECTED;
 
     blockmode(remote->sfd, 0);
-
-    MUT_UNLOCK(&stream_lock);
   }
 }
 
 void stream_received_data(stream *s) {
+  for (;;) {
+    char data[8192];
+    int size = ;
+  }
 }
 
 void srv_init(void) {
-  MUT_INIT(&stream_lock, 1);
+  mutex_init(stream_lock, 1);
 
   signal(SIGPIPE, SIG_IGN);
   stream_init();
@@ -168,12 +170,15 @@ void srv_update(void) {
   stream *s;
   struct timeval tv;
 
+  mutex_lock(stream_lock);
   destory_closed_stream();
+  mutex_unlock(stream_lock);
 
   /* Create fd sets for select */
   select_zero(&select_set);
 
   s = ds_stream;
+  mutex_lock(stream_lock);
   while (s) {
     switch (s->state) {
     case STATE_CONNECTED:
@@ -196,6 +201,7 @@ void srv_update(void) {
 
     s = s->next;
   }
+  mutex_unlock(stream_lock);
 
   tv.tv_sec = update_timeout;
   tv.tv_usec = (update_timeout - tv.tv_sec) * 1e6;
@@ -209,6 +215,8 @@ void srv_update(void) {
 
   /* Handle streams */
   s = ds_stream;
+
+  mutex_lock(stream_lock);
   while (s) {
     switch (s->state) {
     case STATE_CONNECTED:
@@ -235,6 +243,7 @@ void srv_update(void) {
 
     s = s->next;
   }
+  mutex_unlock(stream_lock);
 }
 
 

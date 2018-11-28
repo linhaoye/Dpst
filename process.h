@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define ASSIGN(P, V) P->set(V, sizeof(*V))
+#define ph_assign(p, v) p->set(v, sizeof(*v))
 
 typedef struct {
   char buf[2048];
@@ -20,23 +20,22 @@ typedef struct {
 typedef struct {
   pthread_mutex_t mutex;
   pthread_mutexattr_t attr;
-} mut_t;
+} mutex_t;
 
-#define MUT_INIT(M, T) do { \
-  memset(M, 0, sizeof(*M)); \
-  if (T == 1) {\
-    pthread_mutex_setpshared(&M->attr, PTHREAD_PROCESS_SHARED);\
+#define mutex_init(m, t) do { \
+  memset((m), 0, sizeof(*(m))); \
+  if ((t) == 1) {\
+    pthread_mutex_setpshared(&(m)->attr, PTHREAD_PROCESS_SHARED);\
   }\
-  if (pthread_mutex_init(&M->mutex, &M->attr) < 0) { \
+  if (pthread_mutex_init(&(m)->mutex, &(m)->attr) < 0) { \
     elog(1, "mutex init error:pthread_mutex_init(%x, %x):%s", \
-      &M->mutex, &M->attr, "-1" \
+      &(m)->mutex, &(m)->attr, "-1" \
       );\
   }\
 } while(0)
 
-#define MUT_LOCK(M) pthread_mutex_lock(&M->mutex)
-
-#define MUT_UNLOCK(M) pthread_mutex_unlock(&M->mutex)
+#define mutex_lock(m) pthread_mutex_lock(&(m)->mutex)
+#define mutex_unlock(m) pthread_mutex_unlock(&(m)->mutex)
 
 typedef struct {
   worker *workers;
