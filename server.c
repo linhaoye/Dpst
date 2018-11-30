@@ -109,14 +109,11 @@ void stream_destroy(stream *s) {
   stream_cleanup(s);
 }
 
-int get_stream_count(void) {
-  return stream_count;
-}
-
 void destory_closed_stream(void) {
   stream *s = ds_stream;
 
   while (s) {
+    mutex_lock(stream_lock);
     if (s->state == STATE_CLOSED) {
       stream *next = s->next;
       stream_destroy(s);
@@ -124,7 +121,24 @@ void destory_closed_stream(void) {
     } else {
       s = s->next;
     }
+    mutex_unlock(stream_lock);
   }
+}
+
+void stream_close(stream *s) {
+  if (s->state == STATE_CLOSED) {
+    return;
+  }
+
+  s->state = STATE_CLOSED;
+
+  if (s->sfd != INVALID_SOCKET) {
+    close(s->sfd);
+    s->sfd = INVALID_SOCKET;
+  }
+
+  /* Clear buffer*/
+  buf_clear(s->iobuf);
 }
 
 void stream_accept_connection(stream *s) {
@@ -155,31 +169,39 @@ void stream_accept_connection(stream *s) {
 void stream_received_data(stream *s) {
   for (;;) {
     char data[8192];
-    int size = ;
+    int size = recv(s->sfd, data, sizeof(data) -1, 0);
+    if (size <= 0) {
+      if (size == 0 || ERRNO != EWOULDBLOCK) {
+        /* Handle disconnect */
+      }
+    } 
   }
 }
 
-void srv_init(void) {
+void server_init(void) {
   mutex_init(stream_lock, 1);
 
   signal(SIGPIPE, SIG_IGN);
   stream_init();
 }
 
-void srv_update(void) {
+int server_get_stream_count(void) {
+  return stream_count;
+}
+
+void server_update(void) {
   stream *s;
   struct timeval tv;
 
-  mutex_lock(stream_lock);
   destory_closed_stream();
-  mutex_unlock(stream_lock);
 
   /* Create fd sets for select */
   select_zero(&select_set);
 
   s = ds_stream;
-  mutex_lock(stream_lock);
   while (s) {
+    mutex_lock(stream_lock);
+
     switch (s->state) {
     case STATE_CONNECTED:
       select_add(&select_set, SELECT_READ, s->sfd);
@@ -200,8 +222,8 @@ void srv_update(void) {
     }
 
     s = s->next;
+    mutex_unlock(stream_lock);
   }
-  mutex_unlock(stream_lock);
 
   tv.tv_sec = update_timeout;
   tv.tv_usec = (update_timeout - tv.tv_sec) * 1e6;
@@ -216,8 +238,9 @@ void srv_update(void) {
   /* Handle streams */
   s = ds_stream;
 
-  mutex_lock(stream_lock);
   while (s) {
+    mutex_lock(stream_lock);
+
     switch (s->state) {
     case STATE_CONNECTED:
       if (select_has(&select_set, SELECT_READ, s->sfd)) {
@@ -242,8 +265,8 @@ void srv_update(void) {
     }
 
     s = s->next;
+    mutex_unlock(stream_lock);
   }
-  mutex_unlock(stream_lock);
 }
 
 
