@@ -20,8 +20,6 @@ static process_pool *pool;
 
 enum {
   STATE_CLOSED,
-  STATE_CLOSING,
-  STATE_CONNECTING,
   STATE_CONNECTED,
   STATE_LISTENING
 };
@@ -168,12 +166,21 @@ void stream_accept_connection(stream *s) {
 }
 
 void stream_received_data(stream *s) {
+  char data[8192];
+  int size;
+  job_t job;
+
   for (;;) {
-    char data[8192];
-    int size = recv(s->sfd, data, sizeof(data) -1, 0);
+    memset(&job, 0, sizeof(job));
+    size = recv(s->sfd, data, sizeof(data) -1, 0);
     if (size <= 0) {
       if (size == 0 || ERRNO != EWOULDBLOCK) {
         /* Handle disconnect */
+        job.fd = s->sfd;
+        job.event = EVENT_CLOSE;
+        process_pool_dispatch(pool, &job);
+
+        stream_close(s);
         return;
       } else {
         /* No more data */
@@ -185,13 +192,10 @@ void stream_received_data(stream *s) {
     if (s->state != STATE_CONNECTED) {
       return;
     }
-    
-    job_t job;
-    memset(job, 0, sizeof(job));
 
-    job->fd = s->sfd;
-    job->buf_size = size;
-    job->event = EVENT_DATA;
+    job.fd = s->sfd;
+    job.buf_size = size;
+    job.event = EVENT_DATA;
     memcpy(job.buffer, data, size);
 
     process_pool_dispatch(pool, &job);
@@ -200,9 +204,9 @@ void stream_received_data(stream *s) {
 }
 
 void server_init(void) {
-  mutex_init(stream_lock, 1);
-
   signal(SIGPIPE, SIG_IGN);
+  
+  mutex_init(stream_lock, 1);
   stream_init();
   process_pool_envinit();
 }
@@ -229,15 +233,6 @@ void server_update(void) {
       select_add(&select_set, SELECT_READ, s->sfd);
       break;
 
-    case STATE_CLOSING:
-      select_add(&select_set, SELECT_WRITE, s->sfd);
-      break;
-
-    case STATE_CONNECTING:
-      select_add(&select_set, SELECT_WRITE, s->sfd);
-      select_add(&select_set, SELECT_EXCEPT, s->sfd);
-      break;
-
     case STATE_LISTENING:
       select_add(&select_set, SELECT_READ, s->sfd);
       break;
@@ -259,7 +254,6 @@ void server_update(void) {
 
   /* Handle streams */
   s = ds_stream;
-
   while (s) {
     mutex_lock(stream_lock);
 
@@ -271,12 +265,6 @@ void server_update(void) {
           break;
         }
       }
-      /* Fall through */
-
-    case STATE_CLOSING:
-      break;
-
-    case STATE_CONNECTING:
       break;
 
     case STATE_LISTENING:
