@@ -16,6 +16,7 @@
 static update_timeout = 1;
 static int max_fds = MAX_STREAMS;
 static select_t select_set;
+static process_pool *pool;
 
 enum {
   STATE_CLOSED,
@@ -173,8 +174,28 @@ void stream_received_data(stream *s) {
     if (size <= 0) {
       if (size == 0 || ERRNO != EWOULDBLOCK) {
         /* Handle disconnect */
+        return;
+      } else {
+        /* No more data */
+        return;
       }
-    } 
+    }
+
+    /* Check stream state */
+    if (s->state != STATE_CONNECTED) {
+      return;
+    }
+    
+    job_t job;
+    memset(job, 0, sizeof(job));
+
+    job->fd = s->sfd;
+    job->buf_size = size;
+    job->event = EVENT_DATA;
+    memcpy(job.buffer, data, size);
+
+    process_pool_dispatch(pool, &job);
+    s->bytes_received += size;
   }
 }
 
@@ -183,6 +204,7 @@ void server_init(void) {
 
   signal(SIGPIPE, SIG_IGN);
   stream_init();
+  process_pool_envinit();
 }
 
 int server_get_stream_count(void) {

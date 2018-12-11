@@ -6,9 +6,16 @@
 
 #define ph_assign(p, v) p->set(v, sizeof(*v))
 
+enum {
+  EVENT_DATA,
+  EVENT_CLOSE
+};
+
 typedef struct {
-  char buf[2048];
+  char buf[8192];
   int fd;
+  size_t buf_size;
+  uint8_t event;
 } job_t;
 
 typedef struct {
