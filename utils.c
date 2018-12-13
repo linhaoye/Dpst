@@ -1,37 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
-#include <time.h>
 #include <curl/curl.h>
 #include "utils.h"
+#include "debug.h"
 #include "platform.h"
-
-void elog(int fatal, const char *fmt, ...) {
-  va_list ap;
-
-#if defined(_NDEDUG)
-  if (!fatal) { /* Do not show debug message */
-    return;
-  }
-#endif
-
-  time_t t = time(NULL);
-  struct tm *dm = localtime(&t);
-
-  (void) fprintf(stderr,"[%02d:%02d:%02d] :\t", dm->tm_hour,
-    dm->tm_min, dm->tm_sec);
-
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-
-  fputc('\n', stderr);
-
-  if (fatal) {
-    exit(EXIT_FAILURE);
-  }
-}
 
 int listen_s0(int port, uint32_t addr, int backlog) {
   int fd, sz = 1;
@@ -78,7 +51,7 @@ int listen_s1(uint16_t port) {
   af = PF_INET;
 #endif
   if ((sock = socket(af, SOCK_STREAM, 6)) == -1) {
-    elog(1, "Listen: socket: %s", strerror(ERRNO));
+    ph_log_err("Listen: socket: %s", strerror(ERRNO));
   }
 
   blockmode(sock, 0);
@@ -96,8 +69,8 @@ int listen_s1(uint16_t port) {
   sa.len = sizeof(sa.u.sin);
 #endif
 
-  if (bind(sock, &sa.u.sa, &sa.len) < 0) {
-    elog(1, "listening: af %d bind(%d):%s", af, port,strerror(ERRNO));
+  if (bind(sock, &sa.u.sa, sa.len) < 0) {
+    ph_log_err("listening: af %d bind(%d):%s", af, port,strerror(ERRNO));
   }
 
   (void)listen(sock, 16);
@@ -114,7 +87,7 @@ int blockmode(int fd, int block) {
   int flags;
 
   if ((flags = fcntl(fd,  F_GETFL, 0)) == -1) {
-    elog(0, "nonblock: fcntl(%d, F_GETFL): %s", 
+    ph_log_err("nonblock: fcntl(%d, F_GETFL): %s", 
       fd, strerror(ERRNO));
     return -1;
   }
@@ -126,7 +99,7 @@ int blockmode(int fd, int block) {
   }
 
   if (fcntl(fd, F_SETFL, flags) != 0) {
-    elog(0, "nonblock: fcntl(%d, F_SETFL): %s", 
+    ph_debug("nonblock: fcntl(%d, F_SETFL): %s", 
       fd, strerror(ERRNO));
     return -1;
   }
@@ -148,7 +121,7 @@ void *s_malloc(size_t sz) {
     0
     );
   if (mem < 0) {
-    elog(1, "mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
+    ph_log_err("mmap error: mmap(...,%d,...):%s", sz, strerror(ERRNO));
   }
   return mem;
 #endif
@@ -171,12 +144,12 @@ void *s_calloc(size_t num, size_t sz) {
 #endif
 }
 
-void s_realloc(void *p, size_t old_sz, size_t new_sz) {
+void* s_realloc(void *p, size_t old_sz, size_t new_sz) {
 #ifdef _WIN32
   return NULL;
 #else
   void *newp;
-  newp = s_malloc(sz);
+  newp = s_malloc(new_sz);
   if (newp == NULL) {
     return NULL;
   }
@@ -193,7 +166,7 @@ void s_free(void *p, size_t sz) {
   return;
 #else
   if (munmap(p, sz) < 0) {
-    elog(0, "error: munmap(%x,%d):%s", p, sz, strerror(ERRNO));
+    ph_debug("error: munmap(%x,%d):%s", p, sz, strerror(ERRNO));
   }
 #endif
 }
@@ -230,7 +203,7 @@ void http_get(const char *url, struct cUrl_response_t *content) {
   rcode = curl_global_init(CURL_GLOBAL_ALL);
 
   if (rcode != CURLE_OK) {
-    elog(0, "curl blobal init error: %s", curl_easy_strerror(rcode));
+    ph_debug("curl blobal init error: %s", curl_easy_strerror(rcode));
     return;
   }
 
@@ -249,7 +222,7 @@ void http_get(const char *url, struct cUrl_response_t *content) {
   rcode = curl_easy_perform(curl);
 
   if (rcode != CURLE_OK) {
-    elog(0, "curl request failed. %s", curl_easy_strerror(rcode));
+    ph_debug("curl request failed. %s", curl_easy_strerror(rcode));
   }
 
   curl_easy_cleanup(curl);
@@ -265,7 +238,7 @@ void http_post(const char *url, char *post_field,
   rcode = curl_global_init(CURL_GLOBAL_ALL);
 
   if (rcode != CURLE_OK) {
-    elog(0, "curl global init error: %s", curl_easy_strerror(rcode));
+    ph_debug("curl global init error: %s", curl_easy_strerror(rcode));
     return;
   }
 
@@ -286,7 +259,7 @@ void http_post(const char *url, char *post_field,
   rcode = curl_easy_perform(curl);
 
   if (rcode != CURLE_OK) {
-    elog(0, "curl request failed. %s", curl_easy_strerror(rcode));
+    ph_debug("curl request failed. %s", curl_easy_strerror(rcode));
   }
 
   curl_easy_cleanup(curl);

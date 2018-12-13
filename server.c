@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <stddef.h>
 #include <time.h>
 #include <signal.h>
 #include <assert.h>
@@ -9,6 +11,7 @@
 #include "buffer.h"
 #include "platform.h"
 #include "utils.h"
+#include "debug.h"
 
 #define MAX_STREAMS 64 * 1024
 #define INVALID_SOCKET -1
@@ -59,7 +62,7 @@ stream* stream_new(int sfd, uint8_t used,
                 struct sockaddr_in *sin, size_t buf_sz) {
   assert(sfd > 0);
 
-  if (fd > max_fds) {
+  if (sfd > max_fds) {
     ph_debug("out of max streams!");
     exit(-1);
   }
@@ -72,7 +75,9 @@ stream* stream_new(int sfd, uint8_t used,
   s->iobuf = buf_new(buf_sz);
   s->ctime = time(NULL);
 
-  memcpy(&s->remote_addr, sin, sizeof(*sin));
+  if (sin != NULL) {
+    memcpy(&s->remote_addr, sin, sizeof(*sin));
+  }
 
   /* Add to list an increment count */
   s->next = ds_stream;
@@ -93,8 +98,8 @@ void stream_cleanup(stream *s) {
 
 void stream_destroy(stream *s) {
   stream **next;
-  if (stream->sfd != INVALID_SOCKET) {
-    close(stream->sfd);
+  if (s->sfd != INVALID_SOCKET) {
+    close(s->sfd);
   }
 
   next = &ds_stream;
@@ -147,7 +152,7 @@ void stream_accept_connection(stream *s) {
     socklen_t len;
     int err = 0, sockfd;
 
-    sockfd = accept(s->sfd, &sin, &len);
+    sockfd = accept(s->sfd, (struct sockaddr*)&sin, &len);
 
     if (sockfd == INVALID_SOCKET) {
       err = ERRNO;
@@ -196,7 +201,7 @@ void stream_received_data(stream *s) {
     job.fd = s->sfd;
     job.buf_size = size;
     job.event = EVENT_DATA;
-    memcpy(job.buffer, data, size);
+    memcpy(job.buf, data, size);
 
     process_pool_dispatch(pool, &job);
     s->bytes_received += size;
@@ -281,5 +286,20 @@ void server_update(void) {
 
 
 int main(int argc, char* agrv[]) {
+  server_init();
+
+  int i;
+  for (i = 0; i++; i< 100) {
+    stream_new(i, 1, NULL, 1024);
+  }
+
+  stream *s = ds_stream;
+
+  ph_debug("%x", s);
+  while (s) {
+    ph_debug("fd=%d|used=%d", s->sfd, s->used);
+    s = s->next;
+  }
+
   return 0;
 }

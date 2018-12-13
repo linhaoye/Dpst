@@ -2,6 +2,7 @@
 #include <string.h>
 #include "platform.h"
 #include "utils.h"
+#include "debug.h"
 #include "pipe.h"
 
 typedef struct {
@@ -12,7 +13,7 @@ void pipe_open(pipe_t *pip, int block) {
   mypipe *mypipe = malloc(sizeof (*mypipe));
 
   if (mypipe == NULL) {
-    elog(0, "open pipe: malloc(%d): %s", sizeof(*mypipe), strerror(ERRNO));
+    ph_debug("open pipe: malloc(%d): %s", sizeof(*mypipe), strerror(ERRNO));
   }
 
   memset(mypipe, 0, sizeof (*mypipe));
@@ -23,7 +24,7 @@ void pipe_open(pipe_t *pip, int block) {
   if (pipe(mypipe->fd) < 0) 
 #endif
   {
-    elog(0, "open pipe: pipe(%x): %s", mypipe->fd, strerror(ERRNO));
+    ph_debug("open pipe: pipe(%x): %s", mypipe->fd, strerror(ERRNO));
   }
 
   if (block == 0) {

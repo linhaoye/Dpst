@@ -33,7 +33,7 @@ tlv_new(uint16_t id, tlv_type_t type,
   size_t sz = sizeof(*tlv);
   tlv = malloc(sz);
   if (tlv == NULL) {
-    elog(1, "fata error: malloc(%d): tlv", sz);
+    ph_log_err("fata error: malloc(%d): tlv", sz);
   }
 
   memset(tlv, 0, sz);
@@ -44,7 +44,7 @@ tlv_new(uint16_t id, tlv_type_t type,
   
   tlv->value = malloc(length);  
   if (tlv->value == NULL) {
-    elog(1, "fata error: malloc(%d): tvl->value", length);
+    ph_log_err("fata error: malloc(%d): tvl->value", length);
   }
   memcpy(tlv->value, value, length);
 

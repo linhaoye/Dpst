@@ -8,7 +8,7 @@
 buffer_t* buf_new(size_t sz) {
   buffer_t *buf = malloc(sizeof(*buf));
   if (buf == NULL) {
-    elog(1, "fatal error: malloc(%d)", sizeof(*buf));
+    ph_log_err("fatal error: malloc(%d)", sizeof(*buf));
   }
   buf_init(buf, sz);
 
@@ -24,7 +24,7 @@ void buf_init(buffer_t *buf, size_t sz) {
   if (buf->data == NULL) {
     data = calloc(sz + 1, 1);
     if (data == NULL) {
-      elog(1, "fatal error: calloc(%d, %d)", sz, sizeof(char));
+      ph_log_err("fatal error: calloc(%d, %d)", sz, sizeof(char));
     }
   }
 

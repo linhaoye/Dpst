@@ -10,6 +10,7 @@ typedef int socklen_t;
 #else
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
