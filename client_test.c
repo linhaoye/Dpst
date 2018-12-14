@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <winsock2.h>
+#include <time.h>
 
 #define BUF_SIZE  1024
 void ErrorHandling(char *message);
@@ -37,9 +38,15 @@ int main(int argc, char *argv[]) {
   } else {
     puts("Connected..............");
   }
-
-  fputs("Input message(Q to quit): ", stdout);
-  fgets(message, BUF_SIZE, stdin);
+  
+  while (1) {
+    fputs("Input message(Enter): ", stdout);
+    fgets(message, BUF_SIZE, stdin);
+    if (strcmp(message, "\n")) {
+      break;
+    }
+  }
+  message[strlen(message)-1] = '\0';
 
   if (send(hSocket, message, strlen(message), 0) > 0) {
     printf("%s\n", "Send OK.");
@@ -48,7 +55,7 @@ int main(int argc, char *argv[]) {
   // message[strLen] = 0;
 
   // printf("Message from server: %s\n", message);
-
+  Sleep(5000);
   closesocket(hSocket);
   WSACleanup();
 

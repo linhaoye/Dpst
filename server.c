@@ -89,10 +89,12 @@ stream* stream_new(int sfd, uint8_t used,
 
 void stream_print(void) {
   stream *s = ds_stream;
+  ph_debug("####");
   while (s) {
     ph_debug("stream:sfd=%d,used=%d", s->sfd, s->used);
     s = s->next;
   }
+  ph_debug("####");
 }
 
 void stream_cleanup(stream *s) {
@@ -145,7 +147,13 @@ void stream_close(stream *s) {
   s->state = STATE_CLOSED;
 
   if (s->sfd != INVALID_SOCKET) {
-    close(s->sfd);
+    if (close(s->sfd) < 0) {
+      ph_log_warn("close client[fd=%d] error: %s",
+        s->sfd, strerror(ERRNO));
+      return;
+    } else{
+      ph_debug("client[fd=%d] disconnected!", s->sfd);
+    }
     s->sfd = INVALID_SOCKET;
   }
 
@@ -166,6 +174,7 @@ void stream_accept_connection(stream *s) {
       err = ERRNO;
       if (err == EWOULDBLOCK) {
         /* No more waiting sockets */
+        ph_debug("server accept error: %s",strerror(err));
         return;
       }
     }
@@ -175,6 +184,7 @@ void stream_accept_connection(stream *s) {
     if (remote != NULL) {
       remote->state = STATE_CONNECTED;
       blockmode(remote->sfd, 0);
+      ph_debug("client[fd=%d] connected !", remote->sfd);
     } else {
       /* Reached max connections */
       return;
@@ -182,14 +192,20 @@ void stream_accept_connection(stream *s) {
   }
 }
 
+void job_init(job_t *job) {
+  memset(job, 0, sizeof(*job));
+  job->fd = INVALID_SOCKET;
+  job->event = EVENT_NONE;
+}
+
 void stream_received_data(stream *s) {
-  char data[8192];
   int size;
   job_t job;
 
   for (;;) {
-    memset(&job, 0, sizeof(job));
-    size = recv(s->sfd, data, sizeof(data) -1, 0);
+    job_init(&job);
+    size = recv(s->sfd, job.buf, sizeof(job.buf) -1, 0);
+
     if (size <= 0) {
       if (size == 0 || ERRNO != EWOULDBLOCK) {
         /* Handle disconnect */
@@ -204,7 +220,6 @@ void stream_received_data(stream *s) {
         return;
       }
     }
-
     /* Check stream state */
     if (s->state != STATE_CONNECTED) {
       return;
@@ -213,7 +228,6 @@ void stream_received_data(stream *s) {
     job.fd = s->sfd;
     job.buf_size = size;
     job.event = EVENT_DATA;
-    memcpy(job.buf, data, size);
 
     process_pool_dispatch(pool, &job);
     s->bytes_received += size;
@@ -236,7 +250,7 @@ void server_listen(void) {
 
   int sfd = listen_s1(8388);
   if (sfd > 0) {
-    ph_debug("Server Listening On %d ...", 8388);
+    ph_debug("server[fd=%d] listening on %d ...", sfd, 8388);
   }
 
   mutex_lock(stream_lock);
@@ -297,7 +311,7 @@ void server_update(void) {
     case STATE_CONNECTED:
       if (select_has(&select_set, SELECT_READ, s->sfd)) {
         stream_received_data(s);
-        if (s->state = STATE_CLOSED) {
+        if (s->state == STATE_CLOSED) {
           break;
         }
       }

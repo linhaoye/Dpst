@@ -9,6 +9,7 @@
 #define ph_assign(p, v) p->set(v, sizeof(*v))
 
 enum {
+  EVENT_NONE,
   EVENT_DATA,
   EVENT_CLOSE
 };

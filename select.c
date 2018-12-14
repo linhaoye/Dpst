@@ -47,6 +47,9 @@ void select_add(select_t *s, int set, int fd) {
   }
   p = (unsigned *) s->fds[set];
   p[fd / _UNSIGNED_BIT] |= 1 << (fd % _UNSIGNED_BIT);
+  if (fd > s->maxfd) {
+    s->maxfd = fd;
+  }
 }
 
 int select_has(select_t *s, int set, int fd) {

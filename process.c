@@ -91,8 +91,13 @@ static void worker_process(process_pool *pool, int p) {
       if (pool->task != NULL) {
         pool->task(&jobs);
       }
-      ph_debug("worker[%d] recv jobs: buf=%s | fd=%d  event=%d\n", 
-        pid, jobs.buf, jobs.fd, jobs.event);
+      ph_debug("worker[%d] recv jobs: buf=%s | fd=%d | event=%s\n", 
+        pid,
+        jobs.buf,
+        jobs.fd,
+        (jobs.event == EVENT_DATA ? "EVENT_DATA":
+        (jobs.event == EVENT_CLOSE ? "EVENT_CLOSE" : "EVENT_NONE") )
+      );
     }
   }
 }
@@ -282,11 +287,20 @@ void process_pool_dispatch(process_pool *pool, void *data) {
   m = write(pool->workers[n].pipe_fd, job, sizeof(job_t));
 
   if (m > 0) {
-    ph_debug("master send job: pipefd=%d | buf=%s | fd=%d\n", 
-      pool->workers[n].pipe_fd, job->buf, job->fd);
+    ph_debug("master[%d] send jobs: pipefd=%d | buf=%s | fd=%d | event=%s", 
+      pool->pid,
+      pool->workers[n].pipe_fd,
+      job->buf,
+      job->fd,
+      (job->event == EVENT_DATA ? "EVENT_DATA":
+      (job->event == EVENT_CLOSE ? "EVENT_CLOSE" : "EVENT_NONE") )
+    );
   } else {
-    ph_debug("master send job, got error: %d, %s", 
-      pool->workers[n].pipe_fd, strerror(ERRNO));
+    ph_debug("master[%d] send jobs, got error: pipefd=%d | error=%s", 
+      pool->pid,
+      pool->workers[n].pipe_fd,
+      strerror(ERRNO)
+    );
   }
 }
 

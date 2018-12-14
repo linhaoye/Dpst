@@ -95,7 +95,7 @@ int blockmode(int fd, int block) {
   if (block) {
     flags &= ~O_NONBLOCK;
   } else{
-    flags |= ~O_NONBLOCK;
+    flags |= O_NONBLOCK;
   }
 
   if (fcntl(fd, F_SETFL, flags) != 0) {
