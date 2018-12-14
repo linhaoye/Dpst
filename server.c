@@ -64,7 +64,7 @@ stream* stream_new(int sfd, uint8_t used,
 
   if (sfd > max_fds) {
     ph_debug("out of max streams!");
-    exit(-1);
+    return NULL;
   }
   stream *s;
   s = &stream_list[sfd];
@@ -85,6 +85,14 @@ stream* stream_new(int sfd, uint8_t used,
   stream_count++;
 
   return s;
+}
+
+void stream_print(void) {
+  stream *s = ds_stream;
+  while (s) {
+    ph_debug("stream:sfd=%d,used=%d", s->sfd, s->used);
+    s = s->next;
+  }
 }
 
 void stream_cleanup(stream *s) {
@@ -164,9 +172,13 @@ void stream_accept_connection(stream *s) {
 
     /* Create client stream */
     remote = stream_new(sockfd, 1, &sin, 8192);
-    remote->state = STATE_CONNECTED;
-
-    blockmode(remote->sfd, 0);
+    if (remote != NULL) {
+      remote->state = STATE_CONNECTED;
+      blockmode(remote->sfd, 0);
+    } else {
+      /* Reached max connections */
+      return;
+    }
   }
 }
 
@@ -214,6 +226,27 @@ void server_init(void) {
   mutex_init(stream_lock, 1);
   stream_init();
   process_pool_envinit();
+
+  pool = process_pool_new(3);
+  process_pool_start(pool);
+}
+
+void server_listen(void) {
+  stream *s;
+
+  int sfd = listen_s1(8388);
+  if (sfd > 0) {
+    ph_debug("Server Listening On %d ...", 8388);
+  }
+
+  mutex_lock(stream_lock);
+
+  s = stream_new(sfd, 1, NULL, 1024);
+  if (s != NULL) {
+    s->state = STATE_LISTENING;
+  }
+
+  mutex_unlock(stream_lock);
 }
 
 int server_get_stream_count(void) {
@@ -242,7 +275,6 @@ void server_update(void) {
       select_add(&select_set, SELECT_READ, s->sfd);
       break;
     }
-
     s = s->next;
     mutex_unlock(stream_lock);
   }
@@ -261,7 +293,6 @@ void server_update(void) {
   s = ds_stream;
   while (s) {
     mutex_lock(stream_lock);
-
     switch (s->state) {
     case STATE_CONNECTED:
       if (select_has(&select_set, SELECT_READ, s->sfd)) {
@@ -278,27 +309,17 @@ void server_update(void) {
       }
       break;
     }
-
     s = s->next;
     mutex_unlock(stream_lock);
   }
 }
 
-
 int main(int argc, char* agrv[]) {
   server_init();
+  server_listen();
 
-  int i;
-  for (i = 0; i++; i< 100) {
-    stream_new(i, 1, NULL, 1024);
-  }
-
-  stream *s = ds_stream;
-
-  ph_debug("%x", s);
-  while (s) {
-    ph_debug("fd=%d|used=%d", s->sfd, s->used);
-    s = s->next;
+  while (server_get_stream_count() > 0) {
+    server_update();
   }
 
   return 0;

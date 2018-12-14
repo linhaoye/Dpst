@@ -91,7 +91,8 @@ static void worker_process(process_pool *pool, int p) {
       if (pool->task != NULL) {
         pool->task(&jobs);
       }
-      ph_debug("worker[%d] recv jobs: buf=%s | fd=%d\n", pid, jobs.buf, jobs.fd);
+      ph_debug("worker[%d] recv jobs: buf=%s | fd=%d  event=%d\n", 
+        pid, jobs.buf, jobs.fd, jobs.event);
     }
   }
 }
