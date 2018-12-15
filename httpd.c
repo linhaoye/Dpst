@@ -87,19 +87,19 @@ typedef unsigned short uint16_t;
 #else                       /* Stubs for non-SSL build */
 typedef void *SSL_CTX;
 typedef void *SSL;
-#define SSL_free(x)             (void) 0
+#define SSL_free(x)                 (void) 0
 #define SSL_read(a,b,c)             0
 #define SSL_write(a,b,c)            0
 #define SSL_accept(a)               0
-#define SSL_load_error_strings()        (void) 0
+#define SSL_load_error_strings()    (void) 0
 #define SSL_set_fd(a,b)             0
-#define SSLeay_add_ssl_algorithms()     (void) 0
+#define SSLeay_add_ssl_algorithms()         (void) 0
 #define SSL_CTX_use_certificate_file(a,b,c) 0
 #define SSL_CTX_use_PrivateKey_file(a,b,c)  0
 #define SSL_CTX_new(a)              0
 #define SSL_FILETYPE_PEM            0
-#define SSL_new(a)              0
-#define SSL_ERROR_WANT_WRITE            -1
+#define SSL_new(a)                  0
+#define SSL_ERROR_WANT_WRITE        -1
 #define SSL_ERROR_WANT_READ         -1
 #define SSL_get_error(a,b)          0
 #define SSL_shutdown(a)             (void) 0
@@ -118,25 +118,25 @@ struct llhead {
 
 #define LL_ENTRY(P,T,N) ((T *)((char *)(P) -(unsigned long)(&((T *) 0)->N)))
 
-#define LL_TAIL(H, N)                           \
-    do {                                \
-        ((H)->prev)->next = (N);                \
-        (N)->prev = ((H)->prev);                \
-        (N)->next = (H);                    \
-        (H)->prev = (N);                    \
+#define LL_TAIL(H, N)                               \
+    do {                                            \
+        ((H)->prev)->next = (N);                    \
+        (N)->prev = ((H)->prev);                    \
+        (N)->next = (H);                            \
+        (H)->prev = (N);                            \
     } while (0)
 
-#define LL_DEL(N)                           \
-    do {                                \
+#define LL_DEL(N)                                   \
+    do {                                            \
         ((N)->next)->prev = ((N)->prev);            \
         ((N)->prev)->next = ((N)->next);            \
-        LL_INIT(N);                     \
+        LL_INIT(N);                                 \
     } while (0)
 
 #define LL_FOREACH(H,N) for (N = (H)->next; N != (H); N = (N)->next)
 
 #define LL_FOREACH_SAFE(H,N,T)                      \
-    for (N = (H)->next, T = (N)->next; N != (H);            \
+    for (N = (H)->next, T = (N)->next; N != (H);    \
             N = (T), T = (N)->next)
 
 /* General vector */
@@ -301,7 +301,6 @@ vchr(const struct vec *v, char ch)
 static int
 hturl(const char *s, int len, struct url *u)
 {
-    printf("%s\r\n", s);
     register const char *p, *e;
     struct vec      *v, nil = { 0, 0 };
     
@@ -512,7 +511,7 @@ elog(int fatal, const char *fmt, ...)
 {
     va_list ap;
 
-#if 1
+#if 0
     if (!fatal)     /* Do not show debug messages */
         return;
 #endif
@@ -939,6 +938,7 @@ push(struct iobuf *from, struct iobuf *to)
         if (from->nwritten == from->nread)
             from->nwritten = from->nread = 0;
     } else if (n <= 0 && ERRNO != EWOULDBLOCK) {
+        printf("ssssssss %d\n", n);
         closeiobuf(to);
     } else {
         elog(0, "push: send: %s", strerror(ERRNO));
@@ -1110,6 +1110,7 @@ spawncgi(struct conn *c, const char *prog)
     env[11] = NULL;
 
     ret = redirect(prog, &c->local.fdread, &c->local.fdwrite, env);
+    printf("ret:%d %d %d\n", ret, c->local.fdread, c->local.fdwrite);
 
 #ifdef _WIN32
     c->local.fdread = fdtosock(c->local.fdread, 1);
@@ -1129,6 +1130,7 @@ reply(struct conn *c)
 {
     int n, status = 200;
     char    buf[512], *p;
+    printf("reply:%d", c->local.fdread);
 
     if (htparse(c->local.buf, c->local.nread, &c->hti, cbheader, c) < 0)
         return;
@@ -1446,7 +1448,6 @@ handle(struct conn *c)
 
     if (htparse(c->remote.buf, c->remote.nread, &c->hti, cbheader, c) < 0)
         return;
-    printf("%s\r\n", c->hti.url.ptr);
     c->gotrequest++;
     c->remote.nwritten = c->hti.totlen;
     c->nexpected = c->hti.totlen + vtoint(&c->clength);
@@ -1459,13 +1460,6 @@ handle(struct conn *c)
         senderr(c, 500, "Bad Request", "", "Bad request");
     } else if (checkauth(c, &url.uri) == 1) {
         c->uri = url.uri;
-
-        printf ("proto: %s; len: %d\r\n", url.proto.ptr, url.proto.len);
-        printf ("user: %s; len: %d\r\n", url.user.ptr, url.user.len);
-        printf ("pass: %s; len: %d\r\n", url.pass.ptr, url.pass.len);
-        printf ("host: %s; len: %d\r\n", url.host.ptr, url.host.len);
-        printf("port: %s; len: %d\r\n", url.port.ptr, url.port.len);
-        printf("uri: %s; len: %d\r\n", url.uri.ptr, url.uri.len);   
 
         elog(0, "handle: [%.*s]", c->uri.len, (char *) c->uri.ptr);
         
@@ -1491,6 +1485,8 @@ handle(struct conn *c)
         dotdot(file);
         fixdirsep(file);
 
+        printf("%s\n", file);
+
         if (strstr(file, htpass)) {
             senderr(c, 403, "Forbidden","", "Permission Denied");
         } else if (stat(file, &st) != 0) {
@@ -1505,9 +1501,11 @@ handle(struct conn *c)
             senderr(c, 304, "Not Modified","", "");
 #ifndef NO_CGI
         } else if (strstr(file, cgipat) != NULL) {
-            if (spawncgi(c, file) != 0)
+            printf("%s\n", "Hit cgi..");
+            if (spawncgi(c, file) < 0) {
                 senderr(c, 500, "Server Error", "",
                     "Error executing CGI script");
+            }
             c->cgimode++;
 #endif /* NO_CGI */
         } else if ((c->local.fdread = open(file, O_RDONLY)) != -1
@@ -1563,11 +1561,13 @@ pull(struct iobuf *io)
         n = SSL_read(io->ssl, io->buf + io->nread, buflen);
     else
         n = PULL(io->fdread, io->buf + io->nread, buflen);
+    printf("buf:%s\n", io->buf);
 #if 1
     elog(0, "pull: %d.%p: %d read (%d)", io->fdread, io->ssl, n, ERRNO);
 #endif
 
     if (n <= 0 && ERRNO != EWOULDBLOCK) {
+        printf("vvvvvvv %d\n", n);
         closeiobuf(io);
     } else if (n > 0) {
         io->nread += n;
@@ -1620,9 +1620,11 @@ Accept(int lsn) {
 static void
 disconnect(struct conn *c)
 {
-    if (c->cgimode && !c->gotreply && c->local.nread > 0)
+    if (c->cgimode && !c->gotreply && c->local.nread > 0) {
+        printf("c->local.nread: %d %d %d %d\n", c->local.nread, c->local.nwritten, c->remote.nread, c->remote.nwritten);
         senderr(c, 500, "Server Error", "",
             "Premature end of script headers");
+    }
 
     elog(0, "disconnect.");
     closeconn(c);
@@ -1642,7 +1644,7 @@ main(int argc, char *argv[])
 #endif /* _WIN32 */
 
     /* Parse command-line options*/
-#define GETARG(p)                           \
+#define GETARG(p)                                               \
     if ((p = (argv[i][2] ? &argv[i][2] : argv[++i])) == NULL)   \
         usage(argv[0])
 
@@ -1760,23 +1762,23 @@ main(int argc, char *argv[])
             c = LL_ENTRY(lp, struct conn, link);
             assert(c->remote.fdread != -1);
 
-#define ADDREAD(io)                         \
-do {                                    \
-    if ((io)->fdread != -1 &&                   \
-        (io)->nread < (int) sizeof((io)->buf)) {            \
-        FD_SET((io)->fdread, &rset);                \
-        if ((io)->fdread > maxfd)               \
-            maxfd = (io)->fdread;               \
-    }                               \
+#define ADDREAD(io)                                                 \
+do {                                                                \
+    if ((io)->fdread != -1 &&                                       \
+        (io)->nread < (int) sizeof((io)->buf)) {                    \
+        FD_SET((io)->fdread, &rset);                                \
+        if ((io)->fdread > maxfd)                                   \
+            maxfd = (io)->fdread;                                   \
+    }                                                               \
 } while (0)
 
-#define ADDWRITE(ior,iow)                       \
-do {                                    \
+#define ADDWRITE(ior,iow)                                           \
+do {                                                                \
     if ((iow)->fdwrite != -1 && (ior)->nwritten < (ior)->nread) {   \
-        FD_SET((iow)->fdwrite, &wset);              \
-        if ((iow)->fdwrite > maxfd)             \
-            maxfd = (iow)->fdwrite;             \
-    }                               \
+        FD_SET((iow)->fdwrite, &wset);                              \
+        if ((iow)->fdwrite > maxfd)                                 \
+            maxfd = (iow)->fdwrite;                                 \
+    }                                                               \
 } while (0)
         
             ADDREAD(&c->remote);
@@ -1816,6 +1818,7 @@ do {                                    \
 
                 if (HASDATA(c->local.fdread, &rset)) {
                     pull(&c->local);
+                    printf("bbbbbbb %d\n", c->cgimode);
                     if (c->cgimode && !c->gotreply)
                         reply(c);
                     if (!c->cgimode ||
@@ -1824,10 +1827,13 @@ do {                                    \
                     c->expire = now + ttl;
                 }
 
-                if (HASDATA(c->remote.fdwrite, &wset))
+                if (HASDATA(c->remote.fdwrite, &wset)) {
+                    printf("%s\n", "push local to remote");
                     push(&c->local, &c->remote);
+                }
 
                 if (HASDATA(c->local.fdwrite, &wset)) {
+                    printf("%s\n", "push remote to local");
                     push(&c->remote, &c->local);
                     if (c->ntotal == c->nexpected &&
                         c->remote.nread ==
@@ -1838,8 +1844,10 @@ do {                                    \
                 }
 
                 if (c->remote.fdread == -1 ||
-                    (c->gotrequest && c->local.fdread == -1))
+                    (c->gotrequest && c->local.fdread == -1)) {
+                    printf("xxxxxxxxxxxx%d,%d,%d\n", c->remote.fdread, c->gotrequest, c->local.fdread);
                     disconnect(c);
+                }
             }
         } else {
             elog(0, "select: %d, %s", ERRNO, strerror(ERRNO));
@@ -1848,8 +1856,10 @@ do {                                    \
         /* Handle timed out connections */
         LL_FOREACH_SAFE(&conns, lp, tmp) {
             c = LL_ENTRY(lp, struct conn, link);
-            if (c->expire < now)
+            if (c->expire < now) {
+                printf("%s\n", "dddddddddddd");
                 disconnect(c);
+            }
         }
     }
 
