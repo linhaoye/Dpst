@@ -511,7 +511,7 @@ elog(int fatal, const char *fmt, ...)
 {
     va_list ap;
 
-#if 0
+#if 1
     if (!fatal)     /* Do not show debug messages */
         return;
 #endif
@@ -938,7 +938,6 @@ push(struct iobuf *from, struct iobuf *to)
         if (from->nwritten == from->nread)
             from->nwritten = from->nread = 0;
     } else if (n <= 0 && ERRNO != EWOULDBLOCK) {
-        printf("ssssssss %d\n", n);
         closeiobuf(to);
     } else {
         elog(0, "push: send: %s", strerror(ERRNO));
@@ -1110,7 +1109,6 @@ spawncgi(struct conn *c, const char *prog)
     env[11] = NULL;
 
     ret = redirect(prog, &c->local.fdread, &c->local.fdwrite, env);
-    printf("ret:%d %d %d\n", ret, c->local.fdread, c->local.fdwrite);
 
 #ifdef _WIN32
     c->local.fdread = fdtosock(c->local.fdread, 1);
@@ -1130,10 +1128,12 @@ reply(struct conn *c)
 {
     int n, status = 200;
     char    buf[512], *p;
-    printf("reply:%d", c->local.fdread);
 
-    if (htparse(c->local.buf, c->local.nread, &c->hti, cbheader, c) < 0)
+    if (htparse(c->local.buf, c->local.nread, &c->hti, cbheader, c) < 0) {
+        elog(0, "reply error:%d %d", 
+            c->local.fdread, c->local.nread);
         return;
+    }
 
     c->gotreply++;
 
@@ -1157,7 +1157,7 @@ reply(struct conn *c)
         default:    p = "tralala";  break;
     }
 
-    n = snprintf(buf, sizeof(buf), "HTTP/1.0 %d %s", status, p);
+    n = snprintf(buf, sizeof(buf), "HTTP/1.0 %d %s\r\n", status, p);
     if (c->remote.ssl)
         (void) SSL_write(c->remote.ssl, buf, n);
     else
@@ -1485,8 +1485,6 @@ handle(struct conn *c)
         dotdot(file);
         fixdirsep(file);
 
-        printf("%s\n", file);
-
         if (strstr(file, htpass)) {
             senderr(c, 403, "Forbidden","", "Permission Denied");
         } else if (stat(file, &st) != 0) {
@@ -1501,7 +1499,6 @@ handle(struct conn *c)
             senderr(c, 304, "Not Modified","", "");
 #ifndef NO_CGI
         } else if (strstr(file, cgipat) != NULL) {
-            printf("%s\n", "Hit cgi..");
             if (spawncgi(c, file) < 0) {
                 senderr(c, 500, "Server Error", "",
                     "Error executing CGI script");
@@ -1561,13 +1558,11 @@ pull(struct iobuf *io)
         n = SSL_read(io->ssl, io->buf + io->nread, buflen);
     else
         n = PULL(io->fdread, io->buf + io->nread, buflen);
-    printf("buf:%s\n", io->buf);
 #if 1
     elog(0, "pull: %d.%p: %d read (%d)", io->fdread, io->ssl, n, ERRNO);
 #endif
 
     if (n <= 0 && ERRNO != EWOULDBLOCK) {
-        printf("vvvvvvv %d\n", n);
         closeiobuf(io);
     } else if (n > 0) {
         io->nread += n;
@@ -1621,7 +1616,6 @@ static void
 disconnect(struct conn *c)
 {
     if (c->cgimode && !c->gotreply && c->local.nread > 0) {
-        printf("c->local.nread: %d %d %d %d\n", c->local.nread, c->local.nwritten, c->remote.nread, c->remote.nwritten);
         senderr(c, 500, "Server Error", "",
             "Premature end of script headers");
     }
@@ -1818,7 +1812,6 @@ do {                                                                \
 
                 if (HASDATA(c->local.fdread, &rset)) {
                     pull(&c->local);
-                    printf("bbbbbbb %d\n", c->cgimode);
                     if (c->cgimode && !c->gotreply)
                         reply(c);
                     if (!c->cgimode ||
@@ -1828,12 +1821,10 @@ do {                                                                \
                 }
 
                 if (HASDATA(c->remote.fdwrite, &wset)) {
-                    printf("%s\n", "push local to remote");
                     push(&c->local, &c->remote);
                 }
 
                 if (HASDATA(c->local.fdwrite, &wset)) {
-                    printf("%s\n", "push remote to local");
                     push(&c->remote, &c->local);
                     if (c->ntotal == c->nexpected &&
                         c->remote.nread ==
@@ -1845,7 +1836,6 @@ do {                                                                \
 
                 if (c->remote.fdread == -1 ||
                     (c->gotrequest && c->local.fdread == -1)) {
-                    printf("xxxxxxxxxxxx%d,%d,%d\n", c->remote.fdread, c->gotrequest, c->local.fdread);
                     disconnect(c);
                 }
             }
@@ -1857,7 +1847,6 @@ do {                                                                \
         LL_FOREACH_SAFE(&conns, lp, tmp) {
             c = LL_ENTRY(lp, struct conn, link);
             if (c->expire < now) {
-                printf("%s\n", "dddddddddddd");
                 disconnect(c);
             }
         }

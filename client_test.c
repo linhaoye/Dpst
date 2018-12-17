@@ -51,10 +51,10 @@ int main(int argc, char *argv[]) {
   if (send(hSocket, message, strlen(message), 0) > 0) {
     printf("%s\n", "Send OK.");
   }
-  // strLen = recv(hSocket, message, BUF_SIZE - 1, 0);
-  // message[strLen] = 0;
-
-  // printf("Message from server: %s\n", message);
+  strLen = recv(hSocket, message, BUF_SIZE - 1, 0);
+  message[strLen] = 0;
+  printf("Message from server: %s\n", message);
+  
   Sleep(5000);
   closesocket(hSocket);
   WSACleanup();
