@@ -24,7 +24,8 @@ static process_pool *pool;
 enum {
   STATE_CLOSED,
   STATE_CONNECTED,
-  STATE_LISTENING
+  STATE_LISTENING,
+  STATE_PIPERECV
 };
 
 struct stream {
@@ -72,9 +73,11 @@ stream* stream_new(int sfd, uint8_t used,
   s->state = STATE_CLOSED;
   s->used = used;
   s->sfd = sfd;
-  s->iobuf = buf_new(buf_sz);
   s->ctime = time(NULL);
 
+  if (buf_sz != 0) {
+    s->iobuf = buf_new(buf_sz);
+  }
   if (sin != NULL) {
     memcpy(&s->remote_addr, sin, sizeof(*sin));
   }
@@ -234,6 +237,22 @@ void stream_received_data(stream *s) {
   }
 }
 
+void stream_send_data(stream *s) {
+  int i = 0, size = 0;
+  job_t job;
+  char *data = (char*)&job;
+
+  for (;;) {
+    size = read(s->sfd, data + i, sizeof(job));
+    i = i + size;
+    ph_debug("master recv: %s", data);
+    if (i == sizeof(job)) {
+      break;
+    }
+  }
+  send(job.fd, job.buf, sizeof(job.buf), 0);
+}
+
 void server_init(void) {
   signal(SIGPIPE, SIG_IGN);
   
@@ -243,6 +262,13 @@ void server_init(void) {
 
   pool = process_pool_new(3);
   process_pool_start(pool);
+
+  int i;
+  for (i = 0; i < pool->num_workers; i++) {
+    stream *s = stream_new(pool->workers[i].pipe_fd, 1, NULL, 0);
+    s->state = STATE_PIPERECV;
+    blockmode(s->sfd, 0);
+  }
 }
 
 void server_listen(void) {
@@ -288,6 +314,10 @@ void server_update(void) {
     case STATE_LISTENING:
       select_add(&select_set, SELECT_READ, s->sfd);
       break;
+
+    case STATE_PIPERECV:
+      select_add(&select_set, SELECT_READ, s->sfd);
+      break;
     }
     s = s->next;
     mutex_unlock(stream_lock);
@@ -320,6 +350,12 @@ void server_update(void) {
     case STATE_LISTENING:
       if (select_has(&select_set, SELECT_READ, s->sfd)) {
         stream_accept_connection(s);
+      }
+      break;
+
+    case STATE_PIPERECV:
+      if (select_has(&select_set, SELECT_READ, s->sfd)) {
+        stream_send_data(s);
       }
       break;
     }

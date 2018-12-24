@@ -80,7 +80,7 @@ static void unset(void *data, int sz) {
 }
 
 static void worker_process(process_pool *pool, int p) {
-  int i, n;
+  int n;
   pid_t pid;
   job_t jobs;
 
@@ -91,12 +91,6 @@ static void worker_process(process_pool *pool, int p) {
       if (pool->task != NULL) {
         pool->task(&jobs);
       }
-      for (i=0; i < jobs.buf_size; i++) {
-        jobs.buf[i] += 'A' - 'a';
-      }
-      if (send(jobs.fd, jobs.buf, sizeof(jobs.buf), 0) < 0) {
-        ph_debug("send error: %s", strerror(ERRNO));
-      }
       ph_debug("worker[%d] recv jobs: buf=%s | fd=%d | event=%s\n", 
         pid,
         jobs.buf,
@@ -104,6 +98,9 @@ static void worker_process(process_pool *pool, int p) {
         (jobs.event == EVENT_DATA ? "EVENT_DATA":
         (jobs.event == EVENT_CLOSE ? "EVENT_CLOSE" : "EVENT_NONE") )
       );
+      if (send(jobs.fd, (char*)&jobs, sizeof(jobs), 0) < 0) {
+        ph_debug("worker[%d] send error: %s", strerror(ERRNO));
+      }
     }
   }
 }
